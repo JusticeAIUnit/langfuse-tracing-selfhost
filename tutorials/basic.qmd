@@ -29,7 +29,7 @@ By the end of this tutorial, you'll be able to:
 ## Prerequisites
 
 Before starting, ensure you have:
-- Completed the [Quick Start Guide](../quickstart.qmd)
+- Completed the [Quick Start Guide](quickstart.qmd)
 - Python 3.8+ installed
 - LangFuse SDK installed (`pip install langfuse`)
 - Your environment variables configured
@@ -543,11 +543,11 @@ Try these exercises to reinforce your learning:
 ## Next Steps
 
 ### **Continue Learning**
-- **[Quick Start Guide](../quickstart.qmd)** - Review the basics if needed
+- **[Quick Start Guide](quickstart.qmd)** - Review the basics if needed
 
 ### **Solve Real Problems**
-- **[LLM Applications](llm.qmd)** - Apply tracing to AI applications
-- **[Complex Workflows](workflow.qmd)** - Trace multi-step processes
+- **[LLM Applications](../how-to/llm.qmd)** - Apply tracing to AI applications
+- **[Complex Workflows](../how-to/workflow.qmd)** - Trace multi-step processes
 
 ---
 

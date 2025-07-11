@@ -10,28 +10,28 @@ website:
     left:
       - text: "Home"
         file: index.qmd
-      - text: "Getting Started"
+      - text: "Understanding"
         menu:
           - text: "What is Langfuse?"
-            file: overview.qmd
+            file: explanation/overview.qmd
+      - text: "Learning"
+        menu:
           - text: "Quick Start"
-            file: quickstart.qmd
-      - text: "Examples"
+            file: tutorials/quickstart.qmd
+          - text: "Basic Python Tracing"
+            file: tutorials/basic.qmd
+      - text: "Problem Solving"
         menu:
-          - text: "Basic Tracing"
-            file: examples/basic.qmd
           - text: "LLM Applications"
-            file: examples/llm.qmd
+            file: how-to/llm.qmd
           - text: "Complex Workflows"
-            file: examples/workflow.qmd
-      - text: "Self-Hosted Setup"
-        menu:
+            file: how-to/workflow.qmd
           - text: "Azure Deployment"
-            file: deployment/azure.qmd
+            file: how-to/azure.qmd
           - text: "Environment Config"
-            file: deployment/config.qmd
+            file: how-to/config.qmd
           - text: "Troubleshooting"
-            file: deployment/troubleshooting.qmd
+            file: how-to/troubleshooting.qmd
     right:
       - icon: github
         href: https://github.com/JusticeAIUnit/langfuse-tracing-selfhost

@@ -196,14 +196,15 @@ Congratulations! You've successfully:
 Now that you understand the basics, you can:
 
 ### **Continue Learning (Tutorials)**
-- **[Basic Python Tracing](examples/basic.qmd)** - Learn more patterns and techniques
+- **[Basic Python Tracing](basic.qmd)** - Learn more patterns and techniques
 
 ### **Solve Specific Problems (How-to Guides)**
-- **[LLM Application Tracing](examples/llm.qmd)** - Add tracing to AI applications
-- **[Complex Workflow Monitoring](examples/workflow.qmd)** - Trace multi-step processes
+- **[LLM Application Tracing](../how-to/llm.qmd)** - Add tracing to AI applications
+- **[Complex Workflow Monitoring](../how-to/workflow.qmd)** - Trace multi-step processes
 
 ### **Get Help**
-- **Examples**: Check out our [example implementations](examples/basic.qmd)
+- **Examples**: Check out our [comprehensive Python examples](basic.qmd)
+- **LLM Integration**: See [LLM-specific patterns](../how-to/llm.qmd)
 - **Support**: Contact the Justice AI team for assistance
 
 ## Common Issues

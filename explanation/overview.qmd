@@ -69,9 +69,9 @@ LangFuse is an open-source observability platform specifically designed for Larg
 
 Ready to add observability to your AI applications? 
 
-1. **[Quick Start Guide](quickstart.qmd)** - Learn by doing (Tutorial)
-2. **[Basic Python Tracing](examples/basic.qmd)** - Step-by-step learning (Tutorial)
-3. **[LLM Examples](examples/llm.qmd)** - Solve specific problems (How-to guides)
+1. **[Quick Start Guide](../tutorials/quickstart.qmd)** - Learn by doing (Tutorial)
+2. **[Basic Python Tracing](../tutorials/basic.qmd)** - Step-by-step learning (Tutorial)
+3. **[LLM Examples](../how-to/llm.qmd)** - Solve specific problems (How-to guides)
 
 ## Architecture Overview
 

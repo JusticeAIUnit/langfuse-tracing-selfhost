@@ -486,13 +486,13 @@ except Exception as e:
 ## Next Steps
 
 ### **Continue Learning**
-- **[Basic Python Tracing](basic.qmd)** - Master the fundamentals first
+- **[Basic Python Tracing](../tutorials/basic.qmd)** - Master the fundamentals first
 
 ### **Solve More Complex Problems**
 - **[Complex Workflows](workflow.qmd)** - Trace multi-step AI processes
 
 ### **Deploy and Monitor**
-- **[Azure Deployment](../deployment/azure.qmd)** - Set up your own LangFuse instance
+- **[Azure Deployment](azure.qmd)** - Set up your own LangFuse instance
 
 ---
 

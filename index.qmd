@@ -19,20 +19,20 @@ Each page clearly indicates its type, helping you find exactly what you need whe
 
 ### 📚 **Explanation** - *Understanding-oriented*
 Context and background to deepen your knowledge:
-- [What is LangFuse?](overview.qmd) - Understand the benefits, capabilities, and architecture
+- [What is LangFuse?](explanation/overview.qmd) - Understand the benefits, capabilities, and architecture
 
 ### 🎓 **Tutorials** - *Learning-oriented*
 Step-by-step lessons to build your skills:
-- [Quick Start Guide](quickstart.qmd) - Get up and running in 5 minutes
-- [Basic Python Tracing](examples/basic.qmd) - Master core instrumentation patterns
+- [Quick Start Guide](tutorials/quickstart.qmd) - Get up and running in 5 minutes
+- [Basic Python Tracing](tutorials/basic.qmd) - Master core instrumentation patterns
 
 ### 🛠️ **How-to Guides** - *Problem-oriented*
 Practical solutions for specific challenges:
-- [LLM Application Tracing](examples/llm.qmd) - Solve OpenAI, LangChain, and RAG tracing problems
-- [Complex Workflow Tracing](examples/workflow.qmd) - Handle multi-step processes and batch operations
-- [Azure Deployment](deployment/azure.qmd) - Set up your own LangFuse instance
-- [Environment Configuration](deployment/config.qmd) - Configure your deployment properly
-- [Troubleshooting](deployment/troubleshooting.qmd) - Fix common deployment issues
+- [LLM Application Tracing](how-to/llm.qmd) - Solve OpenAI, LangChain, and RAG tracing problems
+- [Complex Workflow Tracing](how-to/workflow.qmd) - Handle multi-step processes and batch operations
+- [Azure Deployment](how-to/azure.qmd) - Set up your own LangFuse instance
+- [Environment Configuration](how-to/config.qmd) - Configure your deployment properly
+- [Troubleshooting](how-to/troubleshooting.qmd) - Fix common deployment issues
 
 ## Why Use LangFuse?
 
@@ -45,9 +45,9 @@ LangFuse provides essential observability for AI applications, helping you:
 
 ## Quick Links
 
-- [Jump to Basic Examples →](examples/basic.qmd)
-- [See LLM Examples →](examples/llm.qmd)
-- [Deploy Your Own Instance →](deployment/azure.qmd)
+- [Jump to Basic Examples →](tutorials/basic.qmd)
+- [See LLM Examples →](how-to/llm.qmd)
+- [Deploy Your Own Instance →](how-to/azure.qmd)
 
 ---
 

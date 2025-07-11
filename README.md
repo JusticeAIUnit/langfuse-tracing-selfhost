@@ -55,16 +55,17 @@ To run the website locally:
 
 ```
 ├── index.qmd              # Home page
-├── overview.qmd           # What is LangFuse?
-├── quickstart.qmd         # Quick start guide
-├── examples/              # Python examples and patterns
-│   ├── basic.qmd          # Core instrumentation and basic patterns
+├── explanation/           # Understanding-oriented content
+│   └── overview.qmd       # What is LangFuse?
+├── tutorials/             # Learning-oriented content
+│   ├── quickstart.qmd     # Quick start guide
+│   └── basic.qmd          # Core instrumentation and basic patterns
+├── how-to/                # Problem-oriented content
 │   ├── llm.qmd            # LLM applications with OpenAI, LangChain
-│   └── workflow.qmd       # Complex workflows and batch processing
-├── deployment/            # Self-hosted setup
-│   ├── azure.qmd
-│   ├── config.qmd
-│   └── troubleshooting.qmd
+│   ├── workflow.qmd       # Complex workflows and batch processing
+│   ├── azure.qmd          # Azure deployment guide
+│   ├── config.qmd         # Environment configuration
+│   └── troubleshooting.qmd # Common issues and solutions
 ├── _quarto.yml            # Site configuration
 ├── styles.css             # Custom styles
 └── .github/workflows/     # GitHub Actions for deployment
@@ -82,7 +83,7 @@ To run the website locally:
 
 The website is configured via `_quarto.yml` with:
 
-- **Navigation**: Organized by user journey (getting started → examples → deployment)
+- **Navigation**: Organized using the [Diátaxis](https://diataxis.fr/) framework (Understanding → Learning → Problem Solving)
 - **Themes**: Flatly (light) and Darkly (dark) with toggle
 - **Features**: Search, code tools, table of contents
 - **Output**: GitHub Pages compatible

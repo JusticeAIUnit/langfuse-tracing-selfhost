@@ -565,14 +565,14 @@ result = monitor.monitor_workflow("document_processing", sample_metrics)
 ## Next Steps
 
 ### **Continue Learning**
-- **[Basic Python Tracing](basic.qmd)** - Master the fundamentals first
+- **[Basic Python Tracing](../tutorials/basic.qmd)** - Master the fundamentals first
 
 ### **Solve Specific Problems**
 - **[LLM Applications](llm.qmd)** - Apply tracing to AI applications
 
 ### **Deploy and Monitor**
-- **[Azure Deployment](../deployment/azure.qmd)** - Set up your own LangFuse instance
-- **[Environment Configuration](../deployment/config.qmd)** - Configure your deployment
+- **[Azure Deployment](azure.qmd)** - Set up your own LangFuse instance
+- **[Environment Configuration](config.qmd)** - Configure your deployment
 
 ---
 
