@@ -1,6 +1,16 @@
 ---
 title: "What is LangFuse?"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "explanation"
+  purpose: "Understanding-oriented - provides context and background about LangFuse"
 ---
+
+::: {.callout-note icon="false"}
+**📚 Explanation** - This page provides context and background to help you understand LangFuse and why it matters for AI observability.
+:::
 
 LangFuse is an open-source observability platform specifically designed for Large Language Model (LLM) applications. It provides comprehensive tracing, monitoring, and analytics capabilities that help developers understand and optimize their AI-powered systems.
 
@@ -59,9 +69,9 @@ LangFuse is an open-source observability platform specifically designed for Larg
 
 Ready to add observability to your AI applications? 
 
-1. **[Quick Start Guide](quickstart.qmd)** - Get running in 5 minutes
-2. **[Basic Python Tracing](examples/basic.qmd)** - Core instrumentation patterns
-3. **[LLM Examples](examples/llm.qmd)** - OpenAI, LangChain, and RAG implementations
+1. **[Quick Start Guide](quickstart.qmd)** - Learn by doing (Tutorial)
+2. **[Basic Python Tracing](examples/basic.qmd)** - Step-by-step learning (Tutorial)
+3. **[LLM Examples](examples/llm.qmd)** - Solve specific problems (How-to guides)
 
 ## Architecture Overview
 
@@ -75,7 +85,7 @@ graph LR
     
     subgraph SH ["Self-Hosted in AKS"]
         C[LangFuse Server]
-        D[(PostgreSQL)]
+        D[Database]
         E[Web UI]
         C --> D
         C --> E

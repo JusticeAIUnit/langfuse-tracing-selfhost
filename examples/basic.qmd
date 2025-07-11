@@ -1,43 +1,44 @@
 ---
-title: "Basic Python Tracing"
+title: "Basic Python Tracing Tutorial"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "tutorial"
+  purpose: "Learning-oriented - step-by-step lessons for mastering Python tracing patterns"
 ---
 
-This page provides practical examples of common tracing patterns you can implement in your applications.
+::: {.callout-tip icon="false"}
+**🎓 Tutorial** - This tutorial teaches you essential Python tracing patterns through hands-on exercises. You'll build skills progressively from simple to advanced patterns.
+:::
 
-This guide covers essential Python instrumentation patterns and practical examples for implementing LangFuse tracing in your applications.
+# Basic Python Tracing Tutorial
 
-## Installation & Setup
+This tutorial will teach you the fundamental patterns for implementing LangFuse tracing in your Python applications. You'll learn by building increasingly complex examples.
 
-### Install LangFuse
+## Learning Objectives
 
-```bash
-pip install langfuse
+By the end of this tutorial, you'll be able to:
+- Use decorator-based tracing effectively
+- Create manual traces for complex workflows
+- Handle errors and debugging scenarios
+- Monitor performance and resource usage
+- Implement user and session tracking
+- Apply advanced tracing features
 
-# For specific integrations
-pip install langfuse[openai]     # OpenAI integration
-pip install langfuse[langchain]  # LangChain integration
-pip install langfuse[all]        # All integrations
-```
+## Prerequisites
 
-### Environment Configuration
+Before starting, ensure you have:
+- Completed the [Quick Start Guide](../quickstart.qmd)
+- Python 3.8+ installed
+- LangFuse SDK installed (`pip install langfuse`)
+- Your environment variables configured
 
-```python
-import os
-from langfuse import Langfuse
+## Part 1: Master the Decorator Pattern
 
-# Initialize the client
-langfuse = Langfuse(
-    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-    host=os.getenv("LANGFUSE_HOST")
-)
-```
+Let's start with the most common and easiest tracing approach.
 
-## Core Tracing Patterns
-
-### 1. Decorator-Based Tracing (Recommended)
-
-The simplest way to add tracing is using the `@observe` decorator:
+### Exercise 1: Simple Function Tracing
 
 ```python
 from langfuse.decorators import observe
@@ -57,115 +58,235 @@ def process_document(document: str) -> dict:
 @observe()
 def analyze_sentiment(text: str) -> str:
     """Analyze sentiment of the given text."""
-    # Your sentiment analysis logic
-    return "positive"  # Placeholder
+    # Simulate sentiment analysis
+    if "good" in text.lower() or "great" in text.lower():
+        return "positive"
+    elif "bad" in text.lower() or "terrible" in text.lower():
+        return "negative"
+    else:
+        return "neutral"
 
-# Usage
-result = process_document("This is a sample document for analysis")
-print(result)
+# Try it out
+if __name__ == "__main__":
+    result = process_document("This is a great example document")
+    print(f"Result: {result}")
 ```
 
-### 2. Manual Tracing (Advanced Control)
+**What you learned:** The `@observe()` decorator automatically captures function inputs, outputs, and execution time. Notice how nested functions create a trace hierarchy.
 
-For more detailed control over tracing:
+### Exercise 2: Add Context and Metadata
 
 ```python
+@observe(name="document_processor")
+def process_document_with_context(document: str, user_id: str) -> dict:
+    """Process a document with user context."""
+    
+    # The decorator captures function parameters automatically
+    word_count = len(document.split())
+    sentiment = analyze_sentiment(document)
+    
+    # Add custom metadata through the trace
+    from langfuse import Langfuse
+    langfuse = Langfuse()
+    
+    # Get current trace and add metadata
+    current_trace = langfuse.get_current_trace()
+    if current_trace:
+        current_trace.update(
+            metadata={
+                "user_id": user_id,
+                "document_length": len(document),
+                "processing_version": "1.0"
+            },
+            tags=["document", "processing", "v1"]
+        )
+    
+    return {
+        "word_count": word_count,
+        "sentiment": sentiment,
+        "user_id": user_id,
+        "processed": True
+    }
+
+# Try it out
+result = process_document_with_context(
+    "This is a good document to process", 
+    user_id="user_123"
+)
+```
+
+**What you learned:** You can add custom names, metadata, and tags to provide richer context for your traces.
+
+## Part 2: Manual Tracing for Complex Workflows
+
+Sometimes you need more control than decorators provide.
+
+### Exercise 3: Manual Trace Creation
+
+```python
+import os
+from langfuse import Langfuse
+
+langfuse = Langfuse(
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    host=os.getenv("LANGFUSE_HOST")
+)
+
 def manual_processing_example():
-    # Create a trace
+    """Example of manual trace creation for complex workflows."""
+    
+    # Create a main trace
     trace = langfuse.trace(
         name="document_processing_pipeline",
         input={"document": "Sample document text"},
-        tags=["document", "analysis"]
+        tags=["manual", "pipeline"]
     )
     
-    # Add spans for different processing steps
+    # Step 1: Preprocessing
     preprocessing_span = trace.span(
         name="preprocessing",
         input={"raw_text": "Sample document text"}
     )
     
-    # Simulate preprocessing
-    cleaned_text = "Sample document text"
+    # Simulate preprocessing work
+    import time
+    time.sleep(0.1)
+    cleaned_text = "sample document text"
+    
     preprocessing_span.update(output={"cleaned_text": cleaned_text})
     preprocessing_span.end()
     
-    # Analysis span
+    # Step 2: Analysis
     analysis_span = trace.span(
         name="analysis",
         input={"text": cleaned_text}
     )
     
     # Simulate analysis
-    results = {"sentiment": "positive", "word_count": 3}
-    analysis_span.update(output=results)
+    time.sleep(0.2)
+    analysis_result = {"sentiment": "neutral", "confidence": 0.8}
+    
+    analysis_span.update(output=analysis_result)
     analysis_span.end()
     
-    # Update the main trace
-    trace.update(output=results)
+    # Step 3: Post-processing
+    postprocessing_span = trace.span(
+        name="postprocessing",
+        input={"analysis": analysis_result}
+    )
     
-    return results
+    # Simulate post-processing
+    time.sleep(0.1)
+    final_result = {
+        "sentiment": analysis_result["sentiment"],
+        "confidence": analysis_result["confidence"],
+        "processed": True
+    }
+    
+    postprocessing_span.update(output=final_result)
+    postprocessing_span.end()
+    
+    # Update the main trace
+    trace.update(output=final_result)
+    
+    return final_result
+
+# Run the example
+result = manual_processing_example()
+print(f"Manual processing result: {result}")
 ```
 
-### 3. Batch Processing with Detailed Tracing
+**What you learned:** Manual tracing gives you complete control over the trace structure. You can create nested spans to represent different processing steps.
+
+### Exercise 4: Batch Processing with Detailed Tracking
 
 ```python
-def process_batch(records: list) -> dict:
-    """Process a batch of records with detailed tracing."""
+def process_batch_of_documents(documents: list, user_id: str) -> dict:
+    """Process multiple documents with detailed tracing."""
     
     # Create main trace
     trace = langfuse.trace(
         name="batch_processing",
-        input={"batch_size": len(records)},
+        input={"batch_size": len(documents), "user_id": user_id},
         tags=["batch", "processing"]
     )
     
     # Track validation
     validation_span = trace.span(name="validation")
-    validation_span.update(input={"record_count": len(records)})
+    validation_span.update(input={"document_count": len(documents)})
     
-    valid_records = []
-    for record in records:
-        if validate_record(record):
-            valid_records.append(record)
+    valid_documents = []
+    for i, doc in enumerate(documents):
+        if doc and len(doc.strip()) > 0:
+            valid_documents.append(doc)
     
     validation_span.update(output={
-        "valid_records": len(valid_records),
-        "invalid_records": len(records) - len(valid_records)
+        "valid_documents": len(valid_documents),
+        "invalid_documents": len(documents) - len(valid_documents)
     })
     validation_span.end()
     
     # Track processing
     processing_span = trace.span(name="processing")
-    processing_span.update(input={"records_to_process": len(valid_records)})
+    processing_span.update(input={"documents_to_process": len(valid_documents)})
     
     results = []
-    for record in valid_records:
-        processed = process_single_record(record)
-        results.append(processed)
+    for i, doc in enumerate(valid_documents):
+        # Create a span for each document
+        doc_span = processing_span.span(
+            name=f"process_document_{i}",
+            input={"document": doc[:50] + "..." if len(doc) > 50 else doc}
+        )
+        
+        # Process the document
+        result = {
+            "word_count": len(doc.split()),
+            "char_count": len(doc),
+            "index": i
+        }
+        
+        doc_span.update(output=result)
+        doc_span.end()
+        
+        results.append(result)
     
     processing_span.update(output={"processed_count": len(results)})
     processing_span.end()
     
-    # Update main trace
-    trace.update(output={
-        "total_processed": len(results),
-        "success_rate": len(results) / len(records) if records else 0
-    })
+    # Calculate summary
+    total_words = sum(r["word_count"] for r in results)
+    total_chars = sum(r["char_count"] for r in results)
     
-    return {"results": results, "count": len(results)}
+    summary = {
+        "total_documents": len(documents),
+        "processed_successfully": len(results),
+        "total_words": total_words,
+        "total_chars": total_chars,
+        "success_rate": len(results) / len(documents) if documents else 0
+    }
+    
+    trace.update(output=summary)
+    
+    return summary
 
-def validate_record(record: dict) -> bool:
-    """Validate a single record."""
-    return "id" in record and "content" in record
+# Try it out
+documents = [
+    "This is the first document",
+    "Here's another document to process",
+    "", # Invalid document
+    "Final document in the batch"
+]
 
-def process_single_record(record: dict) -> dict:
-    """Process a single record."""
-    return {**record, "processed": True}
+result = process_batch_of_documents(documents, "user_123")
+print(f"Batch processing result: {result}")
 ```
 
-## Error Handling & Debugging
+**What you learned:** You can create detailed trace hierarchies with nested spans to track complex batch operations.
 
-### Automatic Error Capture
+## Part 3: Error Handling and Debugging
+
+### Exercise 5: Automatic Error Capture
 
 ```python
 @observe()
@@ -175,6 +296,10 @@ def risky_operation(data: dict):
         if not data.get("safe", False):
             raise ValueError("Unsafe operation detected")
         
+        # Simulate processing
+        import time
+        time.sleep(0.1)
+        
         result = {"status": "success", "data": data}
         return result
         
@@ -183,14 +308,25 @@ def risky_operation(data: dict):
         print(f"Operation failed: {e}")
         raise  # Re-raise the exception
 
-# Usage - this will create a trace with error information
+# Try both success and failure cases
+print("Testing successful operation:")
 try:
-    result = risky_operation({"safe": False})
+    result = risky_operation({"safe": True, "content": "test"})
+    print(f"Success: {result}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+
+print("\nTesting failed operation:")
+try:
+    result = risky_operation({"safe": False, "content": "test"})
+    print(f"Success: {result}")
 except ValueError as e:
-    print(f"Caught error: {e}")
+    print(f"Expected error caught: {e}")
 ```
 
-### Custom Error Context
+**What you learned:** The `@observe()` decorator automatically captures exceptions and error information in your traces.
+
+### Exercise 6: Custom Error Context
 
 ```python
 def process_with_error_context(data: dict):
@@ -207,52 +343,51 @@ def process_with_error_context(data: dict):
     )
     
     try:
-        if data.get("trigger_error"):
-            raise RuntimeError("Simulated error")
+        # Simulate different types of errors
+        if data.get("trigger_error") == "validation":
+            raise ValueError("Invalid input data")
+        elif data.get("trigger_error") == "processing":
+            raise RuntimeError("Processing failed")
+        elif data.get("trigger_error") == "timeout":
+            raise TimeoutError("Operation timed out")
         
-        result = {"success": True}
+        result = {"success": True, "processed": True}
         trace.update(output=result)
         return result
         
     except Exception as e:
         trace.update(
-            output={"error": str(e)},
+            output={"error": str(e), "error_type": type(e).__name__},
             level="ERROR",
             status_message=f"Processing failed: {str(e)}"
         )
         raise
+
+# Try different error scenarios
+test_cases = [
+    {"user_id": "user_1", "trigger_error": "validation"},
+    {"user_id": "user_2", "trigger_error": "processing"},
+    {"user_id": "user_3", "trigger_error": "timeout"},
+    {"user_id": "user_4"}  # Success case
+]
+
+for case in test_cases:
+    try:
+        result = process_with_error_context(case)
+        print(f"Success for {case}: {result}")
+    except Exception as e:
+        print(f"Error for {case}: {e}")
 ```
 
-## Performance Monitoring
+**What you learned:** You can add rich error context to your traces to help with debugging and monitoring.
 
-### Timing Operations
+## Part 4: Performance Monitoring
 
-```python
-import time
-from datetime import datetime
-
-@observe()
-def timed_operation(duration: float = 1.0):
-    """Operation with built-in timing."""
-    start_time = datetime.now()
-    
-    # Simulate work
-    time.sleep(duration)
-    
-    end_time = datetime.now()
-    processing_time = (end_time - start_time).total_seconds()
-    
-    return {
-        "duration": processing_time,
-        "start_time": start_time.isoformat(),
-        "end_time": end_time.isoformat()
-    }
-```
-
-### Resource Usage Tracking
+### Exercise 7: Resource Usage Tracking
 
 ```python
 import psutil
+import time
 
 @observe()
 def resource_intensive_operation():
@@ -261,34 +396,38 @@ def resource_intensive_operation():
     # Get initial resource state
     process = psutil.Process()
     initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-    initial_cpu = process.cpu_percent()
     
     # Perform operation
     data = []
-    for i in range(100000):
+    for i in range(50000):  # Reduced for tutorial
         data.append(f"item_{i}")
+    
+    # Simulate some processing
+    time.sleep(0.5)
     
     # Get final resource state
     final_memory = process.memory_info().rss / 1024 / 1024  # MB
-    final_cpu = process.cpu_percent()
     
     return {
         "items_processed": len(data),
         "memory_usage": {
-            "initial_mb": initial_memory,
-            "final_mb": final_memory,
-            "delta_mb": final_memory - initial_memory
+            "initial_mb": round(initial_memory, 2),
+            "final_mb": round(final_memory, 2),
+            "delta_mb": round(final_memory - initial_memory, 2)
         },
-        "cpu_usage": {
-            "initial_percent": initial_cpu,
-            "final_percent": final_cpu
-        }
+        "processing_time": 0.5
     }
+
+# Run the resource tracking
+result = resource_intensive_operation()
+print(f"Resource usage: {result}")
 ```
 
-## User & Session Context
+**What you learned:** You can monitor resource usage alongside your application logic to identify performance bottlenecks.
 
-### Session Tracking
+## Part 5: User and Session Context
+
+### Exercise 8: Session Tracking
 
 ```python
 class UserSession:
@@ -307,7 +446,18 @@ class UserSession:
     @observe()
     def process_query(self, query: str) -> str:
         """Process a user query within the session."""
+        # Simulate query processing
         response = f"Response to: {query}"
+        
+        # Add session context
+        langfuse.trace(
+            name="session_query",
+            session_id=self.session_id,
+            user_id=self.user_id,
+            input={"query": query},
+            output={"response": response}
+        )
+        
         return response
     
     @observe()
@@ -316,41 +466,20 @@ class UserSession:
         self.trace.update(output={"session_ended": True})
         return {"session_ended": True}
 
-# Usage
+# Try the session tracking
 session = UserSession("user_123", "session_456")
 response1 = session.process_query("What is AI?")
 response2 = session.process_query("How does ML work?")
 session.end_session()
+
+print(f"Session responses: {response1}, {response2}")
 ```
 
-### Multi-User Context
+**What you learned:** You can track user sessions and group related traces together for better analysis.
 
-```python
-@observe()
-def process_user_request(user_id: str, request_data: dict):
-    """Process request with user context."""
-    
-    trace = langfuse.trace(
-        name="user_request",
-        user_id=user_id,
-        input=request_data,
-        metadata={
-            "user_id": user_id,
-            "request_type": request_data.get("type"),
-            "timestamp": request_data.get("timestamp")
-        },
-        tags=["user_request", request_data.get("type", "unknown")]
-    )
-    
-    result = {"processed": True, "user_id": user_id}
-    trace.update(output=result)
-    
-    return result
-```
+## Part 6: Advanced Features
 
-## Advanced Features
-
-### Conditional Tracing
+### Exercise 9: Conditional Tracing
 
 ```python
 import os
@@ -369,133 +498,57 @@ def conditional_trace(func):
 @conditional_trace
 def debug_function():
     """Function that's only traced in non-production environments."""
-    return {"debug": True}
+    return {"debug": True, "environment": os.getenv("ENVIRONMENT", "unknown")}
 
 # Sampling-based tracing
-@observe(sample_rate=0.1)  # Only trace 10% of calls
+@observe(sample_rate=0.5)  # Only trace 50% of calls
 def high_frequency_function():
     """Function called very frequently."""
-    return {"processed": True}
+    return {"processed": True, "timestamp": time.time()}
+
+# Test conditional tracing
+print("Testing conditional tracing:")
+result = debug_function()
+print(f"Debug function result: {result}")
+
+print("\nTesting sampling (run multiple times to see sampling effect):")
+for i in range(5):
+    result = high_frequency_function()
+    print(f"Call {i+1}: {result}")
 ```
 
-### Custom Metadata and Tags
+**What you learned:** You can control when tracing happens based on environment variables or sampling rates.
 
-```python
-@observe()
-def process_with_metadata(data: dict):
-    """Process data with custom metadata."""
-    
-    # Add metadata to the current trace
-    langfuse.trace(
-        name="data_processing",
-        input=data,
-        metadata={
-            "model_version": "v1.2.3",
-            "environment": "production",
-            "user_tier": "premium"
-        },
-        tags=["data", "processing", "premium"]
-    )
-    
-    return {"processed": True}
-```
+## Summary
 
-## Testing Your Setup
+Congratulations! You've learned the essential patterns for Python tracing:
 
-Create a test script to verify your LangFuse integration:
+- ✅ **Decorator-based tracing** - The easiest way to add tracing
+- ✅ **Manual tracing** - For complex workflows requiring precise control
+- ✅ **Error handling** - Automatic and custom error capture
+- ✅ **Performance monitoring** - Resource usage tracking
+- ✅ **Session management** - User and session context
+- ✅ **Advanced features** - Conditional tracing and sampling
 
-```python
-# test_langfuse.py
-import os
-from langfuse import Langfuse
-from langfuse.decorators import observe
+## Practice Exercises
 
-def test_connection():
-    """Test basic LangFuse connection."""
-    langfuse = Langfuse(
-        public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-        secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-        host=os.getenv("LANGFUSE_HOST")
-    )
-    
-    trace = langfuse.trace(
-        name="test_connection",
-        input={"test": True},
-        output={"success": True}
-    )
-    
-    print("✅ Test trace created successfully!")
-    langfuse.flush()  # Ensure data is sent
+Try these exercises to reinforce your learning:
 
-@observe()
-def test_decorator():
-    """Test the decorator-based tracing."""
-    return {"decorator_test": "success"}
-
-if __name__ == "__main__":
-    test_connection()
-    result = test_decorator()
-    print(f"✅ Decorator test: {result}")
-```
-
-## Best Practices
-
-### 1. Trace Naming
-Use descriptive, hierarchical names:
-```python
-# Good
-@observe(name="user_query_processing")
-def process_query(): pass
-
-@observe(name="document_analysis.extract_entities")
-def extract_entities(): pass
-
-# Avoid
-@observe(name="func1")
-def process_query(): pass
-```
-
-### 2. Sensitive Data Handling
-Be careful with sensitive information:
-```python
-@observe()
-def process_sensitive_data(user_data: dict):
-    # Don't log sensitive data directly
-    safe_metadata = {
-        "user_id": user_data.get("id"),
-        "data_type": type(user_data).__name__,
-        "record_count": len(user_data.get("records", []))
-    }
-    
-    langfuse.trace(
-        name="sensitive_data_processing",
-        metadata=safe_metadata,
-        tags=["sensitive", "user_data"]
-    )
-```
-
-### 3. Performance Considerations
-```python
-# Async processing for better performance
-@observe()
-async def async_processing(data: list):
-    import asyncio
-    tasks = [process_item(item) for item in data]
-    results = await asyncio.gather(*tasks)
-    return results
-
-# Always flush traces before shutdown
-langfuse.flush()  # Synchronous
-# or
-await langfuse.flushAsync()  # Asynchronous
-```
+1. **Create a text processing pipeline** that uses both decorators and manual tracing
+2. **Add error handling** to a function that processes user input
+3. **Implement session tracking** for a simple chatbot
+4. **Monitor resource usage** in a data processing function
+5. **Set up conditional tracing** based on user roles
 
 ## Next Steps
 
-- **[LLM Applications](llm.qmd)** - OpenAI, LangChain, and RAG examples
-- **[Complex Workflows](workflow.qmd)** - Multi-step processes and monitoring
-- **[Quick Start Guide](../quickstart.qmd)** - Get set up in 5 minutes
+### **Continue Learning**
+- **[Quick Start Guide](../quickstart.qmd)** - Review the basics if needed
+
+### **Solve Real Problems**
+- **[LLM Applications](llm.qmd)** - Apply tracing to AI applications
+- **[Complex Workflows](workflow.qmd)** - Trace multi-step processes
 
 ---
 
-*This guide provides the foundation for implementing comprehensive tracing in your Python applications. Adapt these patterns to your specific use cases.* 
+*You now have the foundation to implement comprehensive tracing in your Python applications. Practice with these patterns to build your expertise.* 

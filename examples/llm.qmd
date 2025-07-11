@@ -1,12 +1,26 @@
 ---
-title: "LLM Application Examples"
+title: "LLM Application Tracing"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "how-to"
+  purpose: "Problem-oriented - practical solutions for tracing LLM applications"
 ---
 
-This guide provides examples of tracing Large Language Model applications with LangFuse.
+::: {.callout-note icon="false"}
+**🛠️ How-to Guides** - This section provides practical solutions for common LLM tracing challenges. Each guide addresses a specific problem you might encounter.
+:::
 
-## OpenAI Chat Completion
+# LLM Application Tracing
 
-### Basic OpenAI Integration
+This collection of how-to guides shows you how to solve specific problems when tracing Large Language Model applications with LangFuse.
+
+## How to Trace OpenAI API Calls
+
+**Problem**: You want to monitor OpenAI API usage, costs, and performance.
+
+**Solution**: Use the LangFuse OpenAI integration for automatic tracing.
 
 ```python
 from langfuse.openai import OpenAI
@@ -37,7 +51,13 @@ response = generate_response("Explain machine learning in simple terms")
 print(response)
 ```
 
-### Advanced OpenAI with Context
+**What this solves**: Automatic capture of token usage, costs, latency, and model parameters for every OpenAI API call.
+
+## How to Add Context to Chat Conversations
+
+**Problem**: You need to track multi-turn conversations with context and user information.
+
+**Solution**: Use session tracking and conversation context.
 
 ```python
 @observe()
@@ -72,9 +92,13 @@ conversation = [
 response = chat_with_context(conversation, user_id="user_123")
 ```
 
-## RAG (Retrieval-Augmented Generation)
+**What this solves**: Tracking conversation flow, user attribution, and context preservation across multiple turns.
 
-### Document Retrieval and Generation
+## How to Implement RAG with Tracing
+
+**Problem**: You need to monitor both the retrieval and generation phases of RAG systems.
+
+**Solution**: Create separate traces for retrieval and generation with detailed metrics.
 
 ```python
 from langfuse.decorators import observe
@@ -159,9 +183,13 @@ result = rag_pipeline("How does AI help in government services?")
 print(result)
 ```
 
-## LangChain Integration
+**What this solves**: Visibility into retrieval quality, document relevance scores, and generation performance in RAG systems.
 
-### Basic LangChain with LangFuse
+## How to Trace LangChain Applications
+
+**Problem**: You need to monitor LangChain chains and their components.
+
+**Solution**: Use the LangFuse callback handler for automatic LangChain tracing.
 
 ```python
 from langfuse.callback import CallbackHandler
@@ -192,134 +220,13 @@ result = chain.run(
 print(result)
 ```
 
-### Advanced LangChain Chain
+**What this solves**: Automatic tracing of LangChain chains, including prompt templates, LLM calls, and intermediate steps.
 
-```python
-from langchain.chains import SimpleSequentialChain
-from langchain.chains.llm import LLMChain
-from langchain.prompts import PromptTemplate
+## How to Compare Multiple Models
 
-# First chain: Extract key topics
-topic_template = """
-Extract the key topics from this question: {question}
-Topics:
-"""
-topic_prompt = PromptTemplate(
-    input_variables=["question"],
-    template=topic_template
-)
-topic_chain = LLMChain(llm=llm, prompt=topic_prompt)
+**Problem**: You want to A/B test different models for the same task.
 
-# Second chain: Generate detailed response
-response_template = """
-Based on these topics: {topics}
-Provide a detailed response about AI in government focusing on these areas.
-"""
-response_prompt = PromptTemplate(
-    input_variables=["topics"],
-    template=response_template
-)
-response_chain = LLMChain(llm=llm, prompt=response_prompt)
-
-# Combine chains
-full_chain = SimpleSequentialChain(
-    chains=[topic_chain, response_chain],
-    verbose=True
-)
-
-# Execute with tracing
-result = full_chain.run(
-    input="How can AI improve citizen services?",
-    callbacks=[langfuse_handler]
-)
-```
-
-## Prompt Engineering and A/B Testing
-
-### Prompt Variant Testing
-
-```python
-@observe()
-def test_prompt_variants(query: str, user_id: str = None) -> dict:
-    """Test different prompt variants."""
-    
-    prompts = {
-        "formal": f"Please provide a formal response to: {query}",
-        "casual": f"Hey! Can you help with this: {query}",
-        "detailed": f"Please provide a comprehensive analysis of: {query}"
-    }
-    
-    results = {}
-    
-    for variant, prompt in prompts.items():
-        # Create a span for each variant
-        with langfuse.trace(
-            name=f"prompt_variant_{variant}",
-            input={"prompt": prompt, "variant": variant},
-            user_id=user_id
-        ):
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                max_tokens=200
-            )
-            
-            results[variant] = response.choices[0].message.content
-    
-    return results
-
-# Usage
-variants = test_prompt_variants(
-    "What is machine learning?",
-    user_id="test_user"
-)
-```
-
-### Prompt Performance Tracking
-
-```python
-from langfuse.decorators import observe
-import time
-
-@observe()
-def tracked_generation(prompt: str, temperature: float = 0.7) -> dict:
-    """Generate response with performance tracking."""
-    
-    start_time = time.time()
-    
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        max_tokens=300
-    )
-    
-    end_time = time.time()
-    duration = end_time - start_time
-    
-    result = {
-        "response": response.choices[0].message.content,
-        "duration_seconds": duration,
-        "tokens_used": response.usage.total_tokens,
-        "prompt_tokens": response.usage.prompt_tokens,
-        "completion_tokens": response.usage.completion_tokens,
-        "cost_estimate": calculate_cost(response.usage)
-    }
-    
-    return result
-
-def calculate_cost(usage) -> float:
-    """Calculate estimated cost based on token usage."""
-    # GPT-3.5-turbo pricing (example)
-    input_cost = usage.prompt_tokens * 0.0015 / 1000
-    output_cost = usage.completion_tokens * 0.002 / 1000
-    return input_cost + output_cost
-```
-
-## Multi-Model Comparison
-
-### Compare Different Models
+**Solution**: Create traces for each model and compare performance metrics.
 
 ```python
 @observe()
@@ -353,13 +260,74 @@ def compare_models(prompt: str, models: list = None) -> dict:
     
     return results
 
+def calculate_cost(usage) -> float:
+    """Calculate estimated cost based on token usage."""
+    # GPT-3.5-turbo pricing (example)
+    input_cost = usage.prompt_tokens * 0.0015 / 1000
+    output_cost = usage.completion_tokens * 0.002 / 1000
+    return input_cost + output_cost
+
 # Usage
 comparison = compare_models("Explain the benefits of AI in healthcare")
 ```
 
-## Streaming Responses
+**What this solves**: Side-by-side comparison of model performance, cost, and quality for the same input.
 
-### Track Streaming Generation
+## How to Test Prompt Variants
+
+**Problem**: You want to optimize prompts by testing different versions.
+
+**Solution**: Create separate traces for each prompt variant to compare effectiveness.
+
+```python
+@observe()
+def test_prompt_variants(query: str, user_id: str = None) -> dict:
+    """Test different prompt variants."""
+    
+    prompts = {
+        "formal": f"Please provide a formal response to: {query}",
+        "casual": f"Hey! Can you help with this: {query}",
+        "detailed": f"Please provide a comprehensive analysis of: {query}"
+    }
+    
+    results = {}
+    
+    for variant, prompt in prompts.items():
+        # Create a trace for each variant
+        trace = langfuse.trace(
+            name=f"prompt_variant_{variant}",
+            input={"prompt": prompt, "variant": variant},
+            user_id=user_id
+        )
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=200
+        )
+        
+        result = response.choices[0].message.content
+        results[variant] = result
+        
+        trace.update(output={"response": result})
+    
+    return results
+
+# Usage
+variants = test_prompt_variants(
+    "What is machine learning?",
+    user_id="test_user"
+)
+```
+
+**What this solves**: Systematic testing of different prompt approaches with clear performance tracking.
+
+## How to Monitor Streaming Responses
+
+**Problem**: You need to track streaming LLM responses for real-time applications.
+
+**Solution**: Use manual tracing to capture streaming metrics.
 
 ```python
 @observe()
@@ -367,6 +335,7 @@ def stream_response(prompt: str) -> str:
     """Handle streaming response with tracing."""
     
     full_response = ""
+    start_time = time.time()
     
     stream = client.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -382,15 +351,32 @@ def stream_response(prompt: str) -> str:
             full_response += content
             # Could add real-time monitoring here
     
+    end_time = time.time()
+    
+    # Log streaming metrics
+    langfuse.trace(
+        name="streaming_response",
+        input={"prompt": prompt},
+        output={
+            "response": full_response,
+            "streaming_duration": end_time - start_time,
+            "response_length": len(full_response)
+        }
+    )
+    
     return full_response
 
 # Usage
 response = stream_response("Tell me about AI ethics")
 ```
 
-## Quality Monitoring
+**What this solves**: Monitoring streaming response performance and capturing complete conversation flows.
 
-### Response Quality Scoring
+## How to Track Response Quality
+
+**Problem**: You need to automatically assess and monitor response quality.
+
+**Solution**: Implement quality scoring and log it as trace metadata.
 
 ```python
 @observe()
@@ -407,7 +393,7 @@ def generate_with_quality_check(prompt: str) -> dict:
     
     content = response.choices[0].message.content
     
-    # Assess quality (simplified example)
+    # Assess quality
     quality_score = assess_response_quality(content)
     
     # Log quality score to LangFuse
@@ -425,17 +411,89 @@ def generate_with_quality_check(prompt: str) -> dict:
 
 def assess_response_quality(content: str) -> float:
     """Simple quality assessment."""
-    # Placeholder - implement your quality metrics
+    # Implement your quality metrics here
+    # This is a placeholder example
     score = min(1.0, len(content) / 100)  # Simple length-based scoring
+    
+    # You might implement:
+    # - Sentiment analysis
+    # - Coherence scoring
+    # - Factual accuracy checks
+    # - Relevance scoring
+    
     return score
+
+# Usage
+result = generate_with_quality_check("Explain quantum computing")
 ```
+
+**What this solves**: Automated quality monitoring and performance tracking for LLM outputs.
+
+## How to Handle Rate Limiting
+
+**Problem**: You need to manage API rate limits and track failures.
+
+**Solution**: Implement retry logic with exponential backoff and trace all attempts.
+
+```python
+import time
+from langfuse.decorators import observe
+
+@observe()
+def robust_llm_call(prompt: str, max_retries: int = 3) -> dict:
+    """Make LLM call with retry logic and rate limit handling."""
+    
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=200
+            )
+            
+            return {
+                "response": response.choices[0].message.content,
+                "attempt": attempt + 1,
+                "success": True
+            }
+            
+        except Exception as e:
+            if "rate limit" in str(e).lower() and attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff
+                time.sleep(wait_time)
+                continue
+            else:
+                # Log the failure
+                langfuse.trace(
+                    name="llm_call_failed",
+                    input={"prompt": prompt, "attempt": attempt + 1},
+                    output={"error": str(e), "success": False},
+                    level="ERROR"
+                )
+                raise
+
+# Usage
+try:
+    result = robust_llm_call("What is the capital of France?")
+    print(result)
+except Exception as e:
+    print(f"Failed after all retries: {e}")
+```
+
+**What this solves**: Reliable LLM API calls with proper error handling and retry tracking.
 
 ## Next Steps
 
-- **[Basic Python Tracing](basic.qmd)** - Core instrumentation patterns
-- **[Complex Workflows](workflow.qmd)** - Multi-step processes
-- **[Quick Start Guide](../quickstart.qmd)** - Getting started
+### **Continue Learning**
+- **[Basic Python Tracing](basic.qmd)** - Master the fundamentals first
+
+### **Solve More Complex Problems**
+- **[Complex Workflows](workflow.qmd)** - Trace multi-step AI processes
+
+### **Deploy and Monitor**
+- **[Azure Deployment](../deployment/azure.qmd)** - Set up your own LangFuse instance
 
 ---
 
-*These examples show how to effectively trace LLM applications for monitoring, debugging, and optimization.* 
+*These guides provide solutions for the most common LLM tracing challenges. Adapt the code examples to your specific use cases and requirements.* 

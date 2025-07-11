@@ -4,23 +4,35 @@ title: "LangFuse Tracing at Justice AI"
 
 This site provides comprehensive guidance for implementing observability and tracing in your AI applications using LangFuse.
 
+## Documentation Framework
+
+This documentation follows the [Diátaxis](https://diataxis.fr/) framework, which organizes content based on what you need to accomplish:
+
+- **🎓 Tutorials** - *Learning-oriented* - Step-by-step lessons for building skills
+- **🛠️ How-to Guides** - *Problem-oriented* - Practical solutions for specific challenges  
+- **📚 Explanation** - *Understanding-oriented* - Context and background knowledge
+- **📋 Reference** - *Information-oriented* - Technical specifications and details
+
+Each page clearly indicates its type, helping you find exactly what you need whether you're learning, working, or seeking to understand.
+
 ## What You'll Find Here
 
-### 🚀 **Getting Started**
-- [What is Langfuse?](overview.qmd) - Understanding the benefits and capabilities
-- [Quick Start Guide](quickstart.qmd) - Get up and running in minutes
+### 📚 **Explanation** - *Understanding-oriented*
+Context and background to deepen your knowledge:
+- [What is LangFuse?](overview.qmd) - Understand the benefits, capabilities, and architecture
 
-### 📚 **Python Examples**
-Practical examples with step-by-step implementation:
-- [Basic Tracing Patterns](examples/basic.qmd) - Core instrumentation and common patterns
-- [LLM Application Tracing](examples/llm.qmd) - OpenAI, LangChain, and RAG examples
-- [Complex Workflows](examples/workflow.qmd) - Multi-step processes and batch operations
+### 🎓 **Tutorials** - *Learning-oriented*
+Step-by-step lessons to build your skills:
+- [Quick Start Guide](quickstart.qmd) - Get up and running in 5 minutes
+- [Basic Python Tracing](examples/basic.qmd) - Master core instrumentation patterns
 
-### 🏗️ **Self-Hosted Deployment**
-For teams needing their own LangFuse instance:
-- [Azure Deployment Guide](deployment/azure.qmd)
-- [Environment Configuration](deployment/config.qmd)
-- [Troubleshooting Common Issues](deployment/troubleshooting.qmd)
+### 🛠️ **How-to Guides** - *Problem-oriented*
+Practical solutions for specific challenges:
+- [LLM Application Tracing](examples/llm.qmd) - Solve OpenAI, LangChain, and RAG tracing problems
+- [Complex Workflow Tracing](examples/workflow.qmd) - Handle multi-step processes and batch operations
+- [Azure Deployment](deployment/azure.qmd) - Set up your own LangFuse instance
+- [Environment Configuration](deployment/config.qmd) - Configure your deployment properly
+- [Troubleshooting](deployment/troubleshooting.qmd) - Fix common deployment issues
 
 ## Why Use LangFuse?
 

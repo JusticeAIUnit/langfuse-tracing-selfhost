@@ -1,8 +1,26 @@
 ---
 title: "Quick Start Guide"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "tutorial"
+  purpose: "Learning-oriented - hands-on lesson to get you started with LangFuse"
 ---
 
+::: {.callout-tip icon="false"}
+**🎓 Tutorial** - This is a hands-on lesson that will take you step-by-step through your first LangFuse implementation. You'll learn by doing.
+:::
+
 Get LangFuse tracing working in your application in just a few minutes. This guide assumes you have access to the Justice AI LangFuse instance.
+
+## What You'll Learn
+
+By the end of this tutorial, you'll be able to:
+- Set up LangFuse in your environment
+- Create your first trace
+- View traces in the LangFuse dashboard
+- Understand the basic concepts of observability
 
 ## Prerequisites
 
@@ -10,29 +28,17 @@ Get LangFuse tracing working in your application in just a few minutes. This gui
 - Access to the Justice AI LangFuse instance
 - Your LangFuse API keys (contact the Justice AI team if you don't have these)
 
-## 1. Install the SDK
-
-::: {.panel-tabset}
-
-### Python
+## Step 1: Install the SDK
 
 ```bash
 pip install langfuse
 ```
 
-### JavaScript/Node.js
-
-```bash
-npm install langfuse
-```
-
-### REST API
-
-No installation needed - use any HTTP client.
-
+::: {.callout-note}
+**Why this step matters:** The LangFuse SDK handles all the communication with the tracing server and provides convenient decorators for your code.
 :::
 
-## 2. Set Environment Variables
+## Step 2: Set Up Your Environment
 
 Retrieve these variables from your LangFuse dashboard. Click on a specified
 project > Settings cog > API Keys. Note that traces are grouped by project.
@@ -50,11 +56,9 @@ LANGFUSE_SECRET_KEY=your_secret_key_here
 **Security Note**: Never commit your secret keys to version control. Use environment variables or secure configuration management.
 :::
 
-## 3. Basic Implementation
+## Step 3: Write Your First Traced Function
 
-::: {.panel-tabset}
-
-### Python
+Let's create a simple example to see tracing in action:
 
 ```python
 import os
@@ -70,118 +74,137 @@ langfuse = Langfuse(
 
 # Simple function tracing with decorator
 @observe()
-def process_user_query(query: str) -> str:
-    # Your existing logic here
-    response = f"Processed: {query}"
-    return response
-
-# Manual tracing
-def manual_trace_example():
-    trace = langfuse.trace(name="user_interaction")
+def analyze_text(text: str) -> dict:
+    """Analyze text and return basic metrics."""
+    word_count = len(text.split())
+    char_count = len(text)
     
-    # Add a span for data processing
-    span = trace.span(name="process_query")
-    span.update(input="What is AI?", output="AI is artificial intelligence")
-    span.end()
+    # Simulate some processing time
+    import time
+    time.sleep(0.1)
     
-    trace.update(output="Query processed successfully")
+    return {
+        "word_count": word_count,
+        "char_count": char_count,
+        "processed": True
+    }
 
-# Usage
+# Run the function
 if __name__ == "__main__":
-    result = process_user_query("What is machine learning?")
-    print(result)
+    sample_text = "Hello, this is a sample text for analysis."
+    result = analyze_text(sample_text)
+    print(f"Analysis result: {result}")
     
-    manual_trace_example()
+    # Ensure traces are sent
+    langfuse.flush()
 ```
 
-### JavaScript
-
-```javascript
-import { Langfuse } from "langfuse";
-
-// Initialize LangFuse
-const langfuse = new Langfuse({
-  publicKey: process.env.LANGFUSE_PUBLIC_KEY,
-  secretKey: process.env.LANGFUSE_SECRET_KEY,
-  baseUrl: process.env.LANGFUSE_HOST
-});
-
-// Simple function tracing
-async function processUserQuery(query) {
-  const trace = langfuse.trace({
-    name: "user_query_processing",
-    input: query
-  });
-  
-  const span = trace.span({
-    name: "process_query"
-  });
-  
-  // Your existing logic here
-  const response = `Processed: ${query}`;
-  
-  span.update({
-    output: response
-  });
-  
-  trace.update({
-    output: response
-  });
-  
-  return response;
-}
-
-// Usage
-async function main() {
-  const result = await processUserQuery("What is machine learning?");
-  console.log(result);
-  
-  // Flush traces before shutting down
-  await langfuse.flushAsync();
-}
-
-main().catch(console.error);
-```
-
-### REST API
-
-```bash
-# Create a trace
-curl -X POST "https://<YOUR_LANGFUSE_HOST>/api/public/traces" \
-  -H "Authorization: Bearer your_public_key:your_secret_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "user_query_processing",
-    "input": "What is machine learning?",
-    "output": "Processed: What is machine learning?"
-  }'
-```
-
+::: {.callout-note}
+**What's happening:** The `@observe()` decorator automatically creates a trace for your function, capturing inputs, outputs, and execution time.
 :::
 
-## 4. View Your Traces
+## Step 4: Run Your Code
+
+Save the code above as `first_trace.py` and run it:
+
+```bash
+python first_trace.py
+```
+
+You should see output like:
+```
+Analysis result: {'word_count': 9, 'char_count': 40, 'processed': True}
+```
+
+## Step 5: View Your Traces
 
 1. Navigate to your LangFuse dashboard
 2. Log in with your credentials
 3. Look for your traces in the **Traces** tab
-4. Click on a trace to see detailed execution information
+4. Click on the trace named `analyze_text` to see detailed execution information
 
-## 5. Next Steps
+You should see:
+- Function name and execution time
+- Input parameters
+- Output results
+- Any errors (if they occurred)
 
-### **Add More Context**
-- **User Information**: Include user IDs and session data
-- **Model Details**: Track which models and versions you're using
-- **Custom Metadata**: Add business-specific information
+## Step 6: Try Manual Tracing
 
-### **Implement Advanced Features**
-- **Generations**: Track LLM API calls specifically
-- **Scores**: Add quality metrics and evaluation scores
-- **Sessions**: Group related traces together
+Now let's try creating traces manually for more control:
 
-### **Explore Examples**
-- [Basic Tracing Patterns](examples/basic.qmd)
-- [LLM Application Tracing](examples/llm.qmd)
-- [Workflow Monitoring](examples/workflow.qmd)
+```python
+def manual_trace_example():
+    """Example of manual trace creation."""
+    
+    # Create a trace
+    trace = langfuse.trace(
+        name="text_processing_pipeline",
+        input={"text": "Sample input text"},
+        tags=["tutorial", "manual"]
+    )
+    
+    # Add a span for preprocessing
+    preprocessing_span = trace.span(
+        name="preprocessing",
+        input={"raw_text": "Sample input text"}
+    )
+    
+    # Simulate preprocessing
+    cleaned_text = "sample input text"
+    preprocessing_span.update(output={"cleaned_text": cleaned_text})
+    preprocessing_span.end()
+    
+    # Add a span for analysis
+    analysis_span = trace.span(
+        name="analysis",
+        input={"text": cleaned_text}
+    )
+    
+    # Simulate analysis
+    analysis_result = {"sentiment": "neutral", "confidence": 0.8}
+    analysis_span.update(output=analysis_result)
+    analysis_span.end()
+    
+    # Update the main trace
+    trace.update(output={"result": analysis_result})
+    
+    return analysis_result
+
+# Run the manual example
+if __name__ == "__main__":
+    result = manual_trace_example()
+    print(f"Manual trace result: {result}")
+    langfuse.flush()
+```
+
+::: {.callout-note}
+**What's happening:** Manual tracing gives you complete control over what gets traced and when. You can create nested spans to represent different parts of your workflow.
+:::
+
+## What You've Learned
+
+Congratulations! You've successfully:
+- ✅ Installed the LangFuse SDK
+- ✅ Set up your environment variables
+- ✅ Created your first traced function
+- ✅ Viewed traces in the dashboard
+- ✅ Tried manual tracing for more control
+
+## Next Steps
+
+Now that you understand the basics, you can:
+
+### **Continue Learning (Tutorials)**
+- **[Basic Python Tracing](examples/basic.qmd)** - Learn more patterns and techniques
+
+### **Solve Specific Problems (How-to Guides)**
+- **[LLM Application Tracing](examples/llm.qmd)** - Add tracing to AI applications
+- **[Complex Workflow Monitoring](examples/workflow.qmd)** - Trace multi-step processes
+
+### **Get Help**
+- **Examples**: Check out our [example implementations](examples/basic.qmd)
+- **Support**: Contact the Justice AI team for assistance
 
 ## Common Issues
 
@@ -191,20 +214,9 @@ curl -X POST "https://<YOUR_LANGFUSE_HOST>/api/public/traces" \
 - Ensure network connectivity to the LangFuse instance
 
 ### **Missing Traces**
-- Call `langfuse.flush()` or `langfuse.flushAsync()` before your application exits
+- Call `langfuse.flush()` before your application exits
 - Check for any error messages in your application logs
 - Verify your trace names don't contain special characters
-
-### **Performance Impact**
-- LangFuse is designed to be lightweight
-- Traces are sent asynchronously by default
-- Consider sampling for high-volume applications
-
-## Need Help?
-
-- **Examples**: Check out our [example implementations](examples/basic.qmd)
-- **LLM Integration**: See [LLM-specific patterns](examples/llm.qmd)
-- **Support**: Contact the Justice AI team for assistance
 
 ---
 
