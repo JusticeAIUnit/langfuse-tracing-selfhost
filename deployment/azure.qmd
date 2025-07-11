@@ -1,0 +1,165 @@
+---
+title: "Azure Deployment Guide"
+---
+
+This guide covers deploying your own LangFuse instance on Azure infrastructure.
+
+## Prerequisites
+
+- Azure subscription with appropriate permissions
+- Azure CLI installed and configured
+- Docker knowledge
+- Basic understanding of Azure services
+
+## Architecture Overview
+
+Our recommended Azure architecture includes:
+
+- **Azure Container Instances (ACI)** or **Azure Kubernetes Service (AKS)** for LangFuse
+- **Azure Database for PostgreSQL** for data storage
+- **Azure Application Gateway** for load balancing and SSL termination
+- **Azure Key Vault** for secrets management
+- **Azure Monitor** for logging and monitoring
+
+## Quick Deployment with Azure Container Instances
+
+### 1. Create Resource Group
+
+```bash
+# Set variables
+RESOURCE_GROUP="langfuse-rg"
+LOCATION="uksouth"
+POSTGRES_SERVER="langfuse-postgres-$(date +%s)"
+CONTAINER_NAME="langfuse-app"
+
+# Create resource group
+az group create \
+    --name $RESOURCE_GROUP \
+    --location $LOCATION
+```
+
+### 2. Deploy PostgreSQL Database
+
+```bash
+# Create PostgreSQL server
+az postgres flexible-server create \
+    --resource-group $RESOURCE_GROUP \
+    --name $POSTGRES_SERVER \
+    --location $LOCATION \
+    --admin-user langfuse \
+    --admin-password 'YourSecurePassword123!' \
+    --sku-name Standard_B1ms \
+    --tier Burstable \
+    --storage-size 32 \
+    --version 14
+
+# Create database
+az postgres flexible-server db create \
+    --resource-group $RESOURCE_GROUP \
+    --server-name $POSTGRES_SERVER \
+    --database-name langfuse
+```
+
+### 3. Deploy LangFuse Container
+
+```bash
+# Generate secure keys
+NEXTAUTH_SECRET=$(openssl rand -base64 32)
+SALT=$(openssl rand -base64 32)
+
+# Get PostgreSQL connection string
+POSTGRES_HOST="${POSTGRES_SERVER}.postgres.database.azure.com"
+DATABASE_URL="postgresql://langfuse:YourSecurePassword123!@${POSTGRES_HOST}:5432/langfuse"
+
+# Deploy container
+az container create \
+    --resource-group $RESOURCE_GROUP \
+    --name $CONTAINER_NAME \
+    --image langfuse/langfuse:latest \
+    --dns-name-label langfuse-$(date +%s) \
+    --ports 3000 \
+    --environment-variables \
+        DATABASE_URL="$DATABASE_URL" \
+        NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
+        SALT="$SALT" \
+    --cpu 1 \
+    --memory 2 \
+    --restart-policy Always
+```
+
+## Environment Variables
+
+Essential environment variables for LangFuse:
+
+```bash
+# Database
+DATABASE_URL="postgresql://user:password@host:5432/database"
+
+# Authentication
+NEXTAUTH_SECRET="your-secret-key-here"
+SALT="your-salt-here"
+NEXTAUTH_URL="https://your-langfuse-domain.com"
+
+# Optional: Custom authentication
+AUTH_AZURE_AD_CLIENT_ID="your-azure-ad-client-id"
+AUTH_AZURE_AD_CLIENT_SECRET="your-azure-ad-client-secret"
+AUTH_AZURE_AD_TENANT_ID="your-azure-ad-tenant-id"
+```
+
+## Security Considerations
+
+### Network Security
+
+```bash
+# Create Network Security Group
+az network nsg create \
+    --resource-group $RESOURCE_GROUP \
+    --name langfuse-nsg
+
+# Allow HTTPS traffic
+az network nsg rule create \
+    --resource-group $RESOURCE_GROUP \
+    --nsg-name langfuse-nsg \
+    --name Allow-HTTPS \
+    --protocol tcp \
+    --direction inbound \
+    --priority 1000 \
+    --source-address-prefix '*' \
+    --source-port-range '*' \
+    --destination-address-prefix '*' \
+    --destination-port-range 443 \
+    --access allow
+```
+
+## Monitoring and Backup
+
+### Application Insights
+
+```bash
+# Create Application Insights
+az extension add -n application-insights
+az monitor app-insights component create \
+    --app langfuse-insights \
+    --location $LOCATION \
+    --resource-group $RESOURCE_GROUP \
+    --kind web
+```
+
+### Database Backup
+
+```bash
+# Create backup
+az postgres flexible-server backup create \
+    --resource-group $RESOURCE_GROUP \
+    --server-name $POSTGRES_SERVER \
+    --backup-name langfuse-backup-$(date +%Y%m%d)
+```
+
+## Next Steps
+
+- **[Environment Configuration](config.qmd)** - Detailed configuration options
+- **[Troubleshooting Guide](troubleshooting.qmd)** - Common issues and solutions
+
+---
+
+*Your LangFuse instance should now be running on Azure!* 

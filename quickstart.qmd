@@ -1,0 +1,211 @@
+---
+title: "Quick Start Guide"
+---
+
+Get LangFuse tracing working in your application in just a few minutes. This guide assumes you have access to the Justice AI LangFuse instance.
+
+## Prerequisites
+
+- Python 3.8+
+- Access to the Justice AI LangFuse instance
+- Your LangFuse API keys (contact the Justice AI team if you don't have these)
+
+## 1. Install the SDK
+
+::: {.panel-tabset}
+
+### Python
+
+```bash
+pip install langfuse
+```
+
+### JavaScript/Node.js
+
+```bash
+npm install langfuse
+```
+
+### REST API
+
+No installation needed - use any HTTP client.
+
+:::
+
+## 2. Set Environment Variables
+
+Retrieve these variables from your LangFuse dashboard. Click on a specified
+project > Settings cog > API Keys. Note that traces are grouped by project.
+
+Create a `.env` file in your project root:
+
+```bash
+# LangFuse Configuration
+LANGFUSE_HOST=<YOUR_LANGFUSE_HOST>  # Replace with your actual LangFuse URL
+LANGFUSE_PUBLIC_KEY=your_public_key_here
+LANGFUSE_SECRET_KEY=your_secret_key_here
+```
+
+::: {.callout-warning}
+**Security Note**: Never commit your secret keys to version control. Use environment variables or secure configuration management.
+:::
+
+## 3. Basic Implementation
+
+::: {.panel-tabset}
+
+### Python
+
+```python
+import os
+from langfuse import Langfuse
+from langfuse.decorators import observe
+
+# Initialize LangFuse
+langfuse = Langfuse(
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    host=os.getenv("LANGFUSE_HOST")
+)
+
+# Simple function tracing with decorator
+@observe()
+def process_user_query(query: str) -> str:
+    # Your existing logic here
+    response = f"Processed: {query}"
+    return response
+
+# Manual tracing
+def manual_trace_example():
+    trace = langfuse.trace(name="user_interaction")
+    
+    # Add a span for data processing
+    span = trace.span(name="process_query")
+    span.update(input="What is AI?", output="AI is artificial intelligence")
+    span.end()
+    
+    trace.update(output="Query processed successfully")
+
+# Usage
+if __name__ == "__main__":
+    result = process_user_query("What is machine learning?")
+    print(result)
+    
+    manual_trace_example()
+```
+
+### JavaScript
+
+```javascript
+import { Langfuse } from "langfuse";
+
+// Initialize LangFuse
+const langfuse = new Langfuse({
+  publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+  secretKey: process.env.LANGFUSE_SECRET_KEY,
+  baseUrl: process.env.LANGFUSE_HOST
+});
+
+// Simple function tracing
+async function processUserQuery(query) {
+  const trace = langfuse.trace({
+    name: "user_query_processing",
+    input: query
+  });
+  
+  const span = trace.span({
+    name: "process_query"
+  });
+  
+  // Your existing logic here
+  const response = `Processed: ${query}`;
+  
+  span.update({
+    output: response
+  });
+  
+  trace.update({
+    output: response
+  });
+  
+  return response;
+}
+
+// Usage
+async function main() {
+  const result = await processUserQuery("What is machine learning?");
+  console.log(result);
+  
+  // Flush traces before shutting down
+  await langfuse.flushAsync();
+}
+
+main().catch(console.error);
+```
+
+### REST API
+
+```bash
+# Create a trace
+curl -X POST "https://<YOUR_LANGFUSE_HOST>/api/public/traces" \
+  -H "Authorization: Bearer your_public_key:your_secret_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "user_query_processing",
+    "input": "What is machine learning?",
+    "output": "Processed: What is machine learning?"
+  }'
+```
+
+:::
+
+## 4. View Your Traces
+
+1. Navigate to your LangFuse dashboard
+2. Log in with your credentials
+3. Look for your traces in the **Traces** tab
+4. Click on a trace to see detailed execution information
+
+## 5. Next Steps
+
+### **Add More Context**
+- **User Information**: Include user IDs and session data
+- **Model Details**: Track which models and versions you're using
+- **Custom Metadata**: Add business-specific information
+
+### **Implement Advanced Features**
+- **Generations**: Track LLM API calls specifically
+- **Scores**: Add quality metrics and evaluation scores
+- **Sessions**: Group related traces together
+
+### **Explore Examples**
+- [Basic Tracing Patterns](examples/basic.qmd)
+- [LLM Application Tracing](examples/llm.qmd)
+- [Workflow Monitoring](examples/workflow.qmd)
+
+## Common Issues
+
+### **Connection Problems**
+- Check that your `LANGFUSE_HOST` is correct
+- Verify your API keys are valid
+- Ensure network connectivity to the LangFuse instance
+
+### **Missing Traces**
+- Call `langfuse.flush()` or `langfuse.flushAsync()` before your application exits
+- Check for any error messages in your application logs
+- Verify your trace names don't contain special characters
+
+### **Performance Impact**
+- LangFuse is designed to be lightweight
+- Traces are sent asynchronously by default
+- Consider sampling for high-volume applications
+
+## Need Help?
+
+- **Examples**: Check out our [example implementations](examples/basic.qmd)
+- **LLM Integration**: See [LLM-specific patterns](examples/llm.qmd)
+- **Support**: Contact the Justice AI team for assistance
+
+---
+
+*You should now have basic tracing working! The LangFuse dashboard will show you detailed information about your application's execution.* 

@@ -1,0 +1,441 @@
+---
+title: "LLM Application Examples"
+---
+
+This guide provides examples of tracing Large Language Model applications with LangFuse.
+
+## OpenAI Chat Completion
+
+### Basic OpenAI Integration
+
+```python
+from langfuse.openai import OpenAI
+from langfuse.decorators import observe
+import os
+
+# Initialize OpenAI client with LangFuse
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    langfuse_public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    langfuse_secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    langfuse_host=os.getenv("LANGFUSE_HOST")
+)
+
+@observe()
+def generate_response(prompt: str, model: str = "gpt-3.5-turbo") -> str:
+    """Generate a response using OpenAI with automatic tracing."""
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=150
+    )
+    return response.choices[0].message.content
+
+# Usage
+response = generate_response("Explain machine learning in simple terms")
+print(response)
+```
+
+### Advanced OpenAI with Context
+
+```python
+@observe()
+def chat_with_context(messages: list, user_id: str = None) -> str:
+    """Generate response with conversation context."""
+    
+    # Add system message for context
+    system_message = {
+        "role": "system", 
+        "content": "You are a helpful AI assistant for the Ministry of Justice."
+    }
+    
+    full_messages = [system_message] + messages
+    
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=full_messages,
+        temperature=0.7,
+        max_tokens=500,
+        user=user_id  # Track usage by user
+    )
+    
+    return response.choices[0].message.content
+
+# Usage
+conversation = [
+    {"role": "user", "content": "What is AI?"},
+    {"role": "assistant", "content": "AI is artificial intelligence..."},
+    {"role": "user", "content": "How is it used in government?"}
+]
+
+response = chat_with_context(conversation, user_id="user_123")
+```
+
+## RAG (Retrieval-Augmented Generation)
+
+### Document Retrieval and Generation
+
+```python
+from langfuse.decorators import observe
+from langfuse import Langfuse
+import numpy as np
+
+langfuse = Langfuse()
+
+@observe()
+def embed_query(query: str) -> list:
+    """Create embeddings for the query."""
+    response = client.embeddings.create(
+        model="text-embedding-ada-002",
+        input=query
+    )
+    return response.data[0].embedding
+
+@observe()
+def search_documents(query_embedding: list, top_k: int = 5) -> list:
+    """Search for relevant documents using embeddings."""
+    # Placeholder for document search logic
+    # In practice, this would search your vector database
+    return [
+        {
+            "id": "doc_1",
+            "content": "AI in government improves efficiency...",
+            "score": 0.95
+        },
+        {
+            "id": "doc_2", 
+            "content": "Machine learning helps automate processes...",
+            "score": 0.88
+        }
+    ]
+
+@observe()
+def generate_rag_response(query: str, documents: list) -> str:
+    """Generate response using retrieved documents."""
+    
+    # Construct prompt with retrieved context
+    context = "\n".join([doc["content"] for doc in documents])
+    
+    prompt = f"""
+    Context: {context}
+    
+    Question: {query}
+    
+    Please answer the question based on the provided context.
+    """
+    
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_tokens=300
+    )
+    
+    return response.choices[0].message.content
+
+@observe()
+def rag_pipeline(query: str) -> dict:
+    """Complete RAG pipeline with tracing."""
+    
+    # Step 1: Embed query
+    query_embedding = embed_query(query)
+    
+    # Step 2: Search documents
+    relevant_docs = search_documents(query_embedding)
+    
+    # Step 3: Generate response
+    response = generate_rag_response(query, relevant_docs)
+    
+    return {
+        "query": query,
+        "response": response,
+        "sources": [doc["id"] for doc in relevant_docs],
+        "source_count": len(relevant_docs)
+    }
+
+# Usage
+result = rag_pipeline("How does AI help in government services?")
+print(result)
+```
+
+## LangChain Integration
+
+### Basic LangChain with LangFuse
+
+```python
+from langfuse.callback import CallbackHandler
+from langchain.llms import OpenAI
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+
+# Initialize LangFuse callback handler
+langfuse_handler = CallbackHandler(
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    host=os.getenv("LANGFUSE_HOST")
+)
+
+# Create LangChain components
+llm = OpenAI(temperature=0.7)
+prompt = PromptTemplate(
+    input_variables=["question"],
+    template="You are an AI assistant for the Ministry of Justice. Answer this question: {question}"
+)
+chain = LLMChain(llm=llm, prompt=prompt)
+
+# Execute with tracing
+result = chain.run(
+    question="What are the benefits of AI in legal processes?",
+    callbacks=[langfuse_handler]
+)
+print(result)
+```
+
+### Advanced LangChain Chain
+
+```python
+from langchain.chains import SimpleSequentialChain
+from langchain.chains.llm import LLMChain
+from langchain.prompts import PromptTemplate
+
+# First chain: Extract key topics
+topic_template = """
+Extract the key topics from this question: {question}
+Topics:
+"""
+topic_prompt = PromptTemplate(
+    input_variables=["question"],
+    template=topic_template
+)
+topic_chain = LLMChain(llm=llm, prompt=topic_prompt)
+
+# Second chain: Generate detailed response
+response_template = """
+Based on these topics: {topics}
+Provide a detailed response about AI in government focusing on these areas.
+"""
+response_prompt = PromptTemplate(
+    input_variables=["topics"],
+    template=response_template
+)
+response_chain = LLMChain(llm=llm, prompt=response_prompt)
+
+# Combine chains
+full_chain = SimpleSequentialChain(
+    chains=[topic_chain, response_chain],
+    verbose=True
+)
+
+# Execute with tracing
+result = full_chain.run(
+    input="How can AI improve citizen services?",
+    callbacks=[langfuse_handler]
+)
+```
+
+## Prompt Engineering and A/B Testing
+
+### Prompt Variant Testing
+
+```python
+@observe()
+def test_prompt_variants(query: str, user_id: str = None) -> dict:
+    """Test different prompt variants."""
+    
+    prompts = {
+        "formal": f"Please provide a formal response to: {query}",
+        "casual": f"Hey! Can you help with this: {query}",
+        "detailed": f"Please provide a comprehensive analysis of: {query}"
+    }
+    
+    results = {}
+    
+    for variant, prompt in prompts.items():
+        # Create a span for each variant
+        with langfuse.trace(
+            name=f"prompt_variant_{variant}",
+            input={"prompt": prompt, "variant": variant},
+            user_id=user_id
+        ):
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=200
+            )
+            
+            results[variant] = response.choices[0].message.content
+    
+    return results
+
+# Usage
+variants = test_prompt_variants(
+    "What is machine learning?",
+    user_id="test_user"
+)
+```
+
+### Prompt Performance Tracking
+
+```python
+from langfuse.decorators import observe
+import time
+
+@observe()
+def tracked_generation(prompt: str, temperature: float = 0.7) -> dict:
+    """Generate response with performance tracking."""
+    
+    start_time = time.time()
+    
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        max_tokens=300
+    )
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    result = {
+        "response": response.choices[0].message.content,
+        "duration_seconds": duration,
+        "tokens_used": response.usage.total_tokens,
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+        "cost_estimate": calculate_cost(response.usage)
+    }
+    
+    return result
+
+def calculate_cost(usage) -> float:
+    """Calculate estimated cost based on token usage."""
+    # GPT-3.5-turbo pricing (example)
+    input_cost = usage.prompt_tokens * 0.0015 / 1000
+    output_cost = usage.completion_tokens * 0.002 / 1000
+    return input_cost + output_cost
+```
+
+## Multi-Model Comparison
+
+### Compare Different Models
+
+```python
+@observe()
+def compare_models(prompt: str, models: list = None) -> dict:
+    """Compare responses from different models."""
+    
+    if models is None:
+        models = ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo-preview"]
+    
+    results = {}
+    
+    for model in models:
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=300
+            )
+            
+            results[model] = {
+                "response": response.choices[0].message.content,
+                "tokens": response.usage.total_tokens,
+                "cost": calculate_cost(response.usage)
+            }
+        except Exception as e:
+            results[model] = {
+                "error": str(e),
+                "response": None
+            }
+    
+    return results
+
+# Usage
+comparison = compare_models("Explain the benefits of AI in healthcare")
+```
+
+## Streaming Responses
+
+### Track Streaming Generation
+
+```python
+@observe()
+def stream_response(prompt: str) -> str:
+    """Handle streaming response with tracing."""
+    
+    full_response = ""
+    
+    stream = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=300,
+        stream=True
+    )
+    
+    for chunk in stream:
+        if chunk.choices[0].delta.content is not None:
+            content = chunk.choices[0].delta.content
+            full_response += content
+            # Could add real-time monitoring here
+    
+    return full_response
+
+# Usage
+response = stream_response("Tell me about AI ethics")
+```
+
+## Quality Monitoring
+
+### Response Quality Scoring
+
+```python
+@observe()
+def generate_with_quality_check(prompt: str) -> dict:
+    """Generate response with quality assessment."""
+    
+    # Generate response
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=300
+    )
+    
+    content = response.choices[0].message.content
+    
+    # Assess quality (simplified example)
+    quality_score = assess_response_quality(content)
+    
+    # Log quality score to LangFuse
+    langfuse.score(
+        name="response_quality",
+        value=quality_score,
+        comment=f"Quality assessment for prompt: {prompt[:50]}..."
+    )
+    
+    return {
+        "response": content,
+        "quality_score": quality_score,
+        "tokens_used": response.usage.total_tokens
+    }
+
+def assess_response_quality(content: str) -> float:
+    """Simple quality assessment."""
+    # Placeholder - implement your quality metrics
+    score = min(1.0, len(content) / 100)  # Simple length-based scoring
+    return score
+```
+
+## Next Steps
+
+- **[Workflow Examples](workflow.qmd)** - Multi-step AI processes
+- **[Basic Examples](basic.qmd)** - General tracing patterns
+- **[Python Integration](../instrumentation/python.qmd)** - Detailed setup
+
+---
+
+*These examples show how to effectively trace LLM applications for monitoring, debugging, and optimization.* 

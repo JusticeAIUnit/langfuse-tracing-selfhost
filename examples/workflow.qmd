@@ -1,0 +1,641 @@
+---
+title: "Workflow Tracing Examples"
+---
+
+This guide demonstrates tracing complex, multi-step AI workflows with LangFuse.
+
+## Document Processing Pipeline
+
+### Complete Document Analysis Workflow
+
+```python
+from langfuse.decorators import observe
+from langfuse import Langfuse
+import asyncio
+import os
+
+langfuse = Langfuse()
+
+class DocumentProcessor:
+    """Document processing pipeline with comprehensive tracing."""
+    
+    def __init__(self):
+        self.client = OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            langfuse_public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+            langfuse_secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+            langfuse_host=os.getenv("LANGFUSE_HOST")
+        )
+    
+    @observe()
+    def process_document(self, document_path: str, user_id: str = None) -> dict:
+        """Process a document through the complete pipeline."""
+        
+        # Create main trace
+        trace = langfuse.trace(
+            name="document_processing_pipeline",
+            input={"document_path": document_path},
+            user_id=user_id,
+            tags=["document", "processing", "pipeline"]
+        )
+        
+        try:
+            # Step 1: Extract text
+            text = self._extract_text(document_path)
+            
+            # Step 2: Analyze structure
+            structure = self._analyze_structure(text)
+            
+            # Step 3: Extract entities
+            entities = self._extract_entities(text)
+            
+            # Step 4: Summarize content
+            summary = self._summarize_content(text)
+            
+            # Step 5: Generate insights
+            insights = self._generate_insights(text, entities)
+            
+            # Step 6: Create final report
+            report = self._create_report(summary, entities, insights)
+            
+            result = {
+                "document_path": document_path,
+                "text_length": len(text),
+                "structure": structure,
+                "entities": entities,
+                "summary": summary,
+                "insights": insights,
+                "report": report,
+                "processed_at": datetime.now().isoformat()
+            }
+            
+            trace.update(output=result)
+            return result
+            
+        except Exception as e:
+            trace.update(
+                output={"error": str(e)},
+                level="ERROR"
+            )
+            raise
+    
+    @observe()
+    def _extract_text(self, document_path: str) -> str:
+        """Extract text from document."""
+        # Placeholder - implement actual text extraction
+        return f"Extracted text from {document_path}"
+    
+    @observe()
+    def _analyze_structure(self, text: str) -> dict:
+        """Analyze document structure."""
+        
+        prompt = f"""
+        Analyze the structure of this document:
+        
+        {text[:1000]}...
+        
+        Identify:
+        - Document type
+        - Main sections
+        - Key structural elements
+        """
+        
+        response = self.client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        
+        return {
+            "analysis": response.choices[0].message.content,
+            "type": "detected_type",
+            "sections": ["section1", "section2"]
+        }
+    
+    @observe()
+    def _extract_entities(self, text: str) -> list:
+        """Extract named entities from text."""
+        
+        prompt = f"""
+        Extract key entities from this text:
+        
+        {text[:2000]}...
+        
+        Return as JSON with categories: people, organizations, locations, dates, amounts
+        """
+        
+        response = self.client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        
+        return {
+            "entities": response.choices[0].message.content,
+            "count": 10  # Placeholder
+        }
+    
+    @observe()
+    def _summarize_content(self, text: str) -> str:
+        """Create document summary."""
+        
+        prompt = f"""
+        Provide a concise summary of this document:
+        
+        {text[:3000]}...
+        
+        Focus on key points, decisions, and outcomes.
+        """
+        
+        response = self.client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=200
+        )
+        
+        return response.choices[0].message.content
+    
+    @observe()
+    def _generate_insights(self, text: str, entities: dict) -> list:
+        """Generate insights from document and entities."""
+        
+        prompt = f"""
+        Based on this document and extracted entities, provide key insights:
+        
+        Document: {text[:1000]}...
+        Entities: {entities}
+        
+        Provide 3-5 key insights or recommendations.
+        """
+        
+        response = self.client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5
+        )
+        
+        return [
+            {"insight": response.choices[0].message.content},
+            {"type": "recommendation"}
+        ]
+    
+    @observe()
+    def _create_report(self, summary: str, entities: dict, insights: list) -> dict:
+        """Create final processing report."""
+        
+        return {
+            "summary": summary,
+            "key_entities": entities,
+            "insights": insights,
+            "recommendations": ["rec1", "rec2"],
+            "confidence_score": 0.85
+        }
+
+# Usage
+processor = DocumentProcessor()
+result = processor.process_document("legal_document.pdf", user_id="analyst_123")
+```
+
+## Chatbot Conversation Flow
+
+### Multi-Turn Conversation Handler
+
+```python
+class ConversationHandler:
+    """Handle multi-turn conversations with context tracking."""
+    
+    def __init__(self):
+        self.sessions = {}
+    
+    @observe()
+    def start_conversation(self, user_id: str) -> str:
+        """Start a new conversation session."""
+        
+        session_id = f"session_{user_id}_{int(time.time())}"
+        
+        self.sessions[session_id] = {
+            "user_id": user_id,
+            "messages": [],
+            "context": {},
+            "started_at": datetime.now()
+        }
+        
+        # Create session trace
+        trace = langfuse.trace(
+            name="conversation_session",
+            session_id=session_id,
+            user_id=user_id,
+            tags=["conversation", "session", "start"]
+        )
+        
+        return session_id
+    
+    @observe()
+    def process_message(self, session_id: str, message: str) -> dict:
+        """Process a message in the conversation."""
+        
+        if session_id not in self.sessions:
+            raise ValueError("Session not found")
+        
+        session = self.sessions[session_id]
+        
+        # Add user message to history
+        session["messages"].append({
+            "role": "user",
+            "content": message,
+            "timestamp": datetime.now()
+        })
+        
+        # Determine intent
+        intent = self._classify_intent(message)
+        
+        # Extract entities
+        entities = self._extract_entities(message)
+        
+        # Update context
+        self._update_context(session, intent, entities)
+        
+        # Generate response
+        response = self._generate_response(session, message, intent)
+        
+        # Add assistant response to history
+        session["messages"].append({
+            "role": "assistant",
+            "content": response,
+            "timestamp": datetime.now()
+        })
+        
+        return {
+            "response": response,
+            "intent": intent,
+            "entities": entities,
+            "session_id": session_id
+        }
+    
+    @observe()
+    def _classify_intent(self, message: str) -> str:
+        """Classify user intent."""
+        
+        prompt = f"""
+        Classify the intent of this message:
+        
+        Message: {message}
+        
+        Possible intents: greeting, question, request, complaint, compliment, goodbye
+        Return only the intent name.
+        """
+        
+        response = self.client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=20
+        )
+        
+        return response.choices[0].message.content.strip()
+    
+    @observe()
+    def _extract_entities(self, message: str) -> dict:
+        """Extract entities from message."""
+        
+        # Simplified entity extraction
+        entities = {
+            "keywords": message.lower().split(),
+            "length": len(message),
+            "has_question": "?" in message
+        }
+        
+        return entities
+    
+    @observe()
+    def _update_context(self, session: dict, intent: str, entities: dict):
+        """Update conversation context."""
+        
+        context = session["context"]
+        context["last_intent"] = intent
+        context["message_count"] = len(session["messages"])
+        context["topics"] = context.get("topics", [])
+        
+        # Add new topics based on entities
+        if entities.get("keywords"):
+            context["topics"].extend(entities["keywords"])
+            context["topics"] = list(set(context["topics"]))  # Remove duplicates
+    
+    @observe()
+    def _generate_response(self, session: dict, message: str, intent: str) -> str:
+        """Generate contextual response."""
+        
+        # Build conversation history
+        history = session["messages"][-5:]  # Last 5 messages
+        context = session["context"]
+        
+        system_prompt = f"""
+        You are a helpful assistant for the Ministry of Justice.
+        
+        Current conversation context:
+        - Intent: {intent}
+        - Topics discussed: {context.get('topics', [])}
+        - Message count: {context.get('message_count', 0)}
+        
+        Conversation history:
+        {self._format_history(history)}
+        
+        Respond appropriately to the user's message.
+        """
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ]
+        
+        response = self.client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=200
+        )
+        
+        return response.choices[0].message.content
+    
+    def _format_history(self, history: list) -> str:
+        """Format conversation history for prompt."""
+        formatted = []
+        for msg in history:
+            formatted.append(f"{msg['role']}: {msg['content']}")
+        return "\n".join(formatted)
+
+# Usage
+handler = ConversationHandler()
+session_id = handler.start_conversation("user_123")
+response1 = handler.process_message(session_id, "Hello, I need help with a legal question")
+response2 = handler.process_message(session_id, "What are my rights as a tenant?")
+```
+
+## Batch Processing Workflow
+
+### Parallel Document Processing
+
+```python
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+class BatchProcessor:
+    """Process multiple documents in parallel with detailed tracing."""
+    
+    def __init__(self, max_workers: int = 5):
+        self.max_workers = max_workers
+        self.processor = DocumentProcessor()
+    
+    @observe()
+    async def process_batch(self, documents: list, user_id: str = None) -> dict:
+        """Process multiple documents in parallel."""
+        
+        # Create batch trace
+        trace = langfuse.trace(
+            name="batch_document_processing",
+            input={"document_count": len(documents)},
+            user_id=user_id,
+            tags=["batch", "parallel", "documents"]
+        )
+        
+        try:
+            # Process documents in parallel
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = [
+                    executor.submit(self._process_single_document, doc, user_id)
+                    for doc in documents
+                ]
+                
+                results = []
+                errors = []
+                
+                for i, future in enumerate(futures):
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception as e:
+                        errors.append({
+                            "document_index": i,
+                            "document": documents[i],
+                            "error": str(e)
+                        })
+            
+            # Aggregate results
+            batch_result = {
+                "total_documents": len(documents),
+                "successful": len(results),
+                "failed": len(errors),
+                "success_rate": len(results) / len(documents),
+                "results": results,
+                "errors": errors,
+                "processing_time": time.time() - trace.startTime
+            }
+            
+            trace.update(output=batch_result)
+            return batch_result
+            
+        except Exception as e:
+            trace.update(
+                output={"error": str(e)},
+                level="ERROR"
+            )
+            raise
+    
+    @observe()
+    def _process_single_document(self, document: str, user_id: str) -> dict:
+        """Process a single document with tracing."""
+        return self.processor.process_document(document, user_id)
+
+# Usage
+batch_processor = BatchProcessor(max_workers=3)
+documents = ["doc1.pdf", "doc2.pdf", "doc3.pdf", "doc4.pdf"]
+results = asyncio.run(batch_processor.process_batch(documents, user_id="batch_user"))
+```
+
+## Quality Assurance Workflow
+
+### Multi-Stage Quality Assessment
+
+```python
+class QualityAssurance:
+    """Multi-stage quality assessment workflow."""
+    
+    @observe()
+    def assess_document_quality(self, document_path: str, content: str) -> dict:
+        """Comprehensive quality assessment."""
+        
+        # Stage 1: Technical quality
+        tech_quality = self._assess_technical_quality(content)
+        
+        # Stage 2: Content quality
+        content_quality = self._assess_content_quality(content)
+        
+        # Stage 3: Compliance check
+        compliance = self._check_compliance(content)
+        
+        # Stage 4: Final scoring
+        final_score = self._calculate_final_score(
+            tech_quality, content_quality, compliance
+        )
+        
+        return {
+            "document_path": document_path,
+            "technical_quality": tech_quality,
+            "content_quality": content_quality,
+            "compliance": compliance,
+            "final_score": final_score,
+            "passed": final_score >= 0.7
+        }
+    
+    @observe()
+    def _assess_technical_quality(self, content: str) -> dict:
+        """Assess technical quality metrics."""
+        
+        return {
+            "readability": self._calculate_readability(content),
+            "length": len(content),
+            "structure": self._assess_structure(content),
+            "score": 0.85
+        }
+    
+    @observe()
+    def _assess_content_quality(self, content: str) -> dict:
+        """Assess content quality using AI."""
+        
+        prompt = f"""
+        Assess the quality of this content:
+        
+        {content[:1000]}...
+        
+        Rate on a scale of 0-1 for:
+        - Clarity
+        - Completeness
+        - Accuracy
+        - Relevance
+        """
+        
+        response = self.client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        
+        return {
+            "ai_assessment": response.choices[0].message.content,
+            "score": 0.78
+        }
+    
+    @observe()
+    def _check_compliance(self, content: str) -> dict:
+        """Check regulatory compliance."""
+        
+        return {
+            "gdpr_compliant": True,
+            "accessibility_compliant": True,
+            "language_appropriate": True,
+            "score": 0.92
+        }
+    
+    @observe()
+    def _calculate_final_score(self, tech: dict, content: dict, compliance: dict) -> float:
+        """Calculate weighted final score."""
+        
+        weights = {
+            "technical": 0.3,
+            "content": 0.5,
+            "compliance": 0.2
+        }
+        
+        final_score = (
+            tech["score"] * weights["technical"] +
+            content["score"] * weights["content"] +
+            compliance["score"] * weights["compliance"]
+        )
+        
+        return round(final_score, 2)
+```
+
+## Monitoring and Alerting
+
+### Real-Time Monitoring
+
+```python
+class WorkflowMonitor:
+    """Monitor workflow performance and trigger alerts."""
+    
+    def __init__(self):
+        self.thresholds = {
+            "error_rate": 0.05,
+            "response_time": 30.0,
+            "quality_score": 0.7
+        }
+    
+    @observe()
+    def monitor_workflow(self, workflow_name: str, metrics: dict):
+        """Monitor workflow and trigger alerts if needed."""
+        
+        alerts = []
+        
+        # Check error rate
+        if metrics.get("error_rate", 0) > self.thresholds["error_rate"]:
+            alerts.append({
+                "type": "error_rate_high",
+                "value": metrics["error_rate"],
+                "threshold": self.thresholds["error_rate"]
+            })
+        
+        # Check response time
+        if metrics.get("avg_response_time", 0) > self.thresholds["response_time"]:
+            alerts.append({
+                "type": "response_time_high",
+                "value": metrics["avg_response_time"],
+                "threshold": self.thresholds["response_time"]
+            })
+        
+        # Check quality score
+        if metrics.get("avg_quality_score", 1.0) < self.thresholds["quality_score"]:
+            alerts.append({
+                "type": "quality_score_low",
+                "value": metrics["avg_quality_score"],
+                "threshold": self.thresholds["quality_score"]
+            })
+        
+        if alerts:
+            self._trigger_alerts(workflow_name, alerts)
+        
+        return {
+            "workflow": workflow_name,
+            "metrics": metrics,
+            "alerts": alerts,
+            "status": "alert" if alerts else "healthy"
+        }
+    
+    @observe()
+    def _trigger_alerts(self, workflow_name: str, alerts: list):
+        """Trigger alerts for workflow issues."""
+        
+        for alert in alerts:
+            # Log alert to LangFuse
+            langfuse.trace(
+                name="workflow_alert",
+                input={
+                    "workflow": workflow_name,
+                    "alert_type": alert["type"],
+                    "value": alert["value"],
+                    "threshold": alert["threshold"]
+                },
+                level="WARNING",
+                tags=["alert", "monitoring", workflow_name]
+            )
+```
+
+## Next Steps
+
+- **[LLM Examples](llm.qmd)** - AI-specific patterns
+- **[Basic Examples](basic.qmd)** - Simple tracing patterns
+- **[Python Integration](../instrumentation/python.qmd)** - Implementation details
+
+---
+
+*These workflow examples demonstrate how to trace complex, multi-step processes for comprehensive observability.* 

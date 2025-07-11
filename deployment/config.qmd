@@ -1,0 +1,162 @@
+---
+title: "Environment Configuration"
+---
+
+This guide covers detailed configuration options for your LangFuse deployment.
+
+## Core Environment Variables
+
+### Database Configuration
+
+```bash
+# PostgreSQL connection string
+DATABASE_URL=postgresql://username:password@host:5432/database_name
+
+# Alternative format for Azure
+DATABASE_URL=postgresql://username:password@servername.postgres.database.azure.com:5432/database_name?sslmode=require
+```
+
+### Authentication Settings
+
+```bash
+# Required for session management
+NEXTAUTH_SECRET=your-secret-here
+SALT=your-salt-for-hashing
+
+# Application URL
+NEXTAUTH_URL=https://your-domain.com
+
+# Optional: Custom session timeout (default: 30 days)
+NEXTAUTH_SESSION_MAX_AGE=2592000
+```
+
+### Azure Active Directory Integration
+
+```bash
+# Azure AD OAuth configuration
+AUTH_AZURE_AD_CLIENT_ID=your-azure-ad-client-id
+AUTH_AZURE_AD_CLIENT_SECRET=your-azure-ad-client-secret  
+AUTH_AZURE_AD_TENANT_ID=your-azure-ad-tenant-id
+
+# Azure AD configuration endpoint
+AUTH_AZURE_AD_WELL_KNOWN=https://login.microsoftonline.com/your-tenant-id/v2.0/.well-known/openid-configuration
+```
+
+## Optional Configuration
+
+### Application Settings
+
+```bash
+# Application name and branding
+NEXT_PUBLIC_LANGFUSE_CLOUD_REGION=uk-south
+LANGFUSE_INIT_ORG_ID=your-org-id
+LANGFUSE_INIT_ORG_NAME="Your Organization"
+
+# Feature flags
+LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=false
+LANGFUSE_DEFAULT_PROJECT_ROLE=VIEWER
+```
+
+### Performance Tuning
+
+```bash
+# Database connection pooling
+DATABASE_CONNECTION_POOL_SIZE=10
+DATABASE_CONNECTION_TIMEOUT=30000
+
+# Request limits
+MAX_REQUEST_SIZE=10mb
+RATE_LIMIT_REQUESTS_PER_MINUTE=1000
+```
+
+### Monitoring and Logging
+
+```bash
+# Logging configuration
+LOG_LEVEL=info
+LANGFUSE_LOG_LEVEL=info
+
+# Application Insights (if using)
+APPLICATIONINSIGHTS_CONNECTION_STRING=your-app-insights-connection-string
+```
+
+## Security Configuration
+
+### API Keys and Secrets
+
+```bash
+# Generate secure keys
+openssl rand -base64 32  # For NEXTAUTH_SECRET
+openssl rand -base64 16  # For SALT
+
+# Store in Azure Key Vault
+az keyvault secret set --vault-name your-vault --name "langfuse-nextauth-secret" --value "your-secret"
+```
+
+### Network Security
+
+```bash
+# CORS configuration
+NEXT_PUBLIC_LANGFUSE_CORS_ORIGIN=https://your-frontend-domain.com
+
+# API rate limiting
+LANGFUSE_API_RATE_LIMIT_ENABLED=true
+LANGFUSE_API_RATE_LIMIT_REQUESTS_PER_MINUTE=100
+```
+
+## Production Checklist
+
+### Required for Production
+
+- [ ] Set strong `NEXTAUTH_SECRET` and `SALT`
+- [ ] Configure proper `DATABASE_URL` with SSL
+- [ ] Set up Azure AD authentication
+- [ ] Configure HTTPS with valid certificates
+- [ ] Set up monitoring and logging
+- [ ] Configure backup strategy
+- [ ] Set up proper network security groups
+
+### Recommended for Production
+
+- [ ] Enable Application Insights
+- [ ] Configure custom domain
+- [ ] Set up Azure Key Vault for secrets
+- [ ] Configure autoscaling
+- [ ] Set up health checks
+- [ ] Configure disaster recovery
+
+## Example Production Configuration
+
+```bash
+# Production .env file
+DATABASE_URL=postgresql://langfuse:${DATABASE_PASSWORD}@langfuse-db.postgres.database.azure.com:5432/langfuse?sslmode=require
+NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+SALT=${SALT}
+NEXTAUTH_URL=<YOUR_LANGFUSE_DOMAIN>
+
+# Azure AD Integration
+AUTH_AZURE_AD_CLIENT_ID=${AZURE_AD_CLIENT_ID}
+AUTH_AZURE_AD_CLIENT_SECRET=${AZURE_AD_CLIENT_SECRET}
+AUTH_AZURE_AD_TENANT_ID=${AZURE_AD_TENANT_ID}
+
+# Application Settings
+LANGFUSE_INIT_ORG_ID=your-org-id
+LANGFUSE_INIT_ORG_NAME="Your Organization"
+LOG_LEVEL=info
+
+# Monitoring
+APPLICATIONINSIGHTS_CONNECTION_STRING=${APP_INSIGHTS_CONNECTION_STRING}
+
+# Security
+LANGFUSE_API_RATE_LIMIT_ENABLED=true
+LANGFUSE_API_RATE_LIMIT_REQUESTS_PER_MINUTE=100
+```
+
+## Next Steps
+
+- **[Azure Deployment Guide](azure.qmd)** - Complete deployment walkthrough
+- **[Troubleshooting](troubleshooting.qmd)** - Common configuration issues
+
+---
+
+*Proper configuration is crucial for a secure and performant LangFuse deployment.* 

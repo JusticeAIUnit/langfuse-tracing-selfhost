@@ -1,0 +1,53 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "LangFuse Tracing at Justice AI"
+  navbar:
+    background: primary
+    search: true
+    left:
+      - text: "Home"
+        file: index.qmd
+      - text: "Getting Started"
+        menu:
+          - text: "What is Langfuse?"
+            file: overview.qmd
+          - text: "Quick Start"
+            file: quickstart.qmd
+      - text: "Examples"
+        menu:
+          - text: "Basic Tracing"
+            file: examples/basic.qmd
+          - text: "LLM Applications"
+            file: examples/llm.qmd
+          - text: "Complex Workflows"
+            file: examples/workflow.qmd
+      - text: "Self-Hosted Setup"
+        menu:
+          - text: "Azure Deployment"
+            file: deployment/azure.qmd
+          - text: "Environment Config"
+            file: deployment/config.qmd
+          - text: "Troubleshooting"
+            file: deployment/troubleshooting.qmd
+    right:
+      - icon: github
+        href: https://github.com/JusticeAIUnit/langfuse-tracing-selfhost
+
+format:
+  html:
+    theme: 
+      light: flatly
+      dark: darkly
+    css: styles.css
+    toc: true
+    toc-location: right
+    code-fold: true
+    highlight-style: github
+    mermaid:
+      theme: neutral
+
+execute:
+  freeze: auto 

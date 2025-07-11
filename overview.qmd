@@ -1,0 +1,89 @@
+---
+title: "What is LangFuse?"
+---
+
+LangFuse is an open-source observability platform specifically designed for Large Language Model (LLM) applications. It provides comprehensive tracing, monitoring, and analytics capabilities that help developers understand and optimize their AI-powered systems.
+
+## Core Capabilities
+
+### 🔍 **Tracing & Observability**
+- **Detailed Execution Traces** - See exactly how your AI workflows execute
+- **Nested Span Tracking** - Monitor complex, multi-step processes
+- **Real-time Monitoring** - Live visibility into application performance
+- **Error Tracking** - Identify and diagnose issues quickly
+
+### 📊 **Analytics & Insights**
+- **Performance Metrics** - Latency, throughput, and success rates
+- **Cost Tracking** - Monitor token usage and API costs
+- **Usage Patterns** - Understand how your applications are being used
+- **Quality Metrics** - Track model performance and output quality
+
+### 🛠️ **Developer Experience**
+- **Easy Integration** - Simple Python SDK with decorator-based tracing
+- **Flexible Deployment** - Cloud-hosted or self-hosted options
+- **Rich Dashboard** - Intuitive web interface for exploring traces
+- **Open Source** - Full transparency and community-driven development
+
+## Why LangFuse at Justice AI?
+
+### **Regulatory Compliance**
+- **Audit Trails** - Complete records of AI decision-making processes
+- **Data Sovereignty** - Self-hosted deployment keeps data within MoJ infrastructure
+- **Transparency** - Clear visibility into how AI systems operate
+
+### **Operational Excellence**
+- **Proactive Monitoring** - Catch issues before they impact users
+- **Performance Optimization** - Identify bottlenecks and optimization opportunities
+- **Cost Management** - Track and optimize AI-related expenses
+
+### **Quality Assurance**
+- **Model Behavior Analysis** - Understand how models perform across different scenarios
+- **Prompt Engineering** - Iterate and improve prompts based on real usage data
+- **A/B Testing** - Compare different approaches and configurations
+
+## Common Use Cases
+
+### **Application Development**
+- **RAG Systems** - Monitor retrieval accuracy and generation quality
+- **Chatbots** - Track conversation flows and response quality
+- **Document Processing** - Trace multi-stage document analysis workflows
+- **Decision Support** - Monitor AI-assisted decision-making processes
+
+### **DevOps & MLOps**
+- **CI/CD Integration** - Automated testing and validation of AI components
+- **Model Deployment** - Monitor model performance in production
+- **Incident Response** - Quick diagnosis and resolution of AI-related issues
+- **Capacity Planning** - Understand resource requirements and scaling needs
+
+## Getting Started
+
+Ready to add observability to your AI applications? 
+
+1. **[Quick Start Guide](quickstart.qmd)** - Get running in 5 minutes
+2. **[Basic Python Tracing](examples/basic.qmd)** - Core instrumentation patterns
+3. **[LLM Examples](examples/llm.qmd)** - OpenAI, LangChain, and RAG implementations
+
+## Architecture Overview
+
+<div style="text-align: center;">
+
+```{mermaid}
+graph LR
+    subgraph DE ["Application Environment"]
+        A[Your App] --> B[LangFuse SDK]
+    end
+    
+    subgraph SH ["Self-Hosted in AKS"]
+        C[LangFuse Server]
+        D[(PostgreSQL)]
+        E[Web UI]
+        C --> D
+        C --> E
+    end
+    
+    B --> C
+```
+
+</div>
+
+LangFuse operates as a separate service that receives trace data from your applications, providing a centralized platform for monitoring and analysis while keeping your core application logic unchanged. 

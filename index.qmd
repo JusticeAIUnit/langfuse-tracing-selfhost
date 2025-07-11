@@ -1,0 +1,42 @@
+---
+title: "LangFuse Tracing at Justice AI"
+---
+
+This site provides comprehensive guidance for implementing observability and tracing in your AI applications using LangFuse.
+
+## What You'll Find Here
+
+### 🚀 **Getting Started**
+- [What is Langfuse?](overview.qmd) - Understanding the benefits and capabilities
+- [Quick Start Guide](quickstart.qmd) - Get up and running in minutes
+
+### 📚 **Python Examples**
+Practical examples with step-by-step implementation:
+- [Basic Tracing Patterns](examples/basic.qmd) - Core instrumentation and common patterns
+- [LLM Application Tracing](examples/llm.qmd) - OpenAI, LangChain, and RAG examples
+- [Complex Workflows](examples/workflow.qmd) - Multi-step processes and batch operations
+
+### 🏗️ **Self-Hosted Deployment**
+For teams needing their own LangFuse instance:
+- [Azure Deployment Guide](deployment/azure.qmd)
+- [Environment Configuration](deployment/config.qmd)
+- [Troubleshooting Common Issues](deployment/troubleshooting.qmd)
+
+## Why Use LangFuse?
+
+LangFuse provides essential observability for AI applications, helping you:
+
+- **Debug Complex Workflows** - Trace execution paths through multi-step AI processes
+- **Monitor Performance** - Track latency, token usage, and costs across your AI stack
+- **Improve Quality** - Identify issues in prompts, responses, and model behavior
+- **Ensure Compliance** - Maintain audit trails for AI decision-making processes
+
+## Quick Links
+
+- [Jump to Basic Examples →](examples/basic.qmd)
+- [See LLM Examples →](examples/llm.qmd)
+- [Deploy Your Own Instance →](deployment/azure.qmd)
+
+---
+
+*This documentation is maintained by the Justice AI Unit. For questions or contributions, please see our [GitHub repository](https://github.com/JusticeAIUnit/langfuse-tracing-selfhost).* 
