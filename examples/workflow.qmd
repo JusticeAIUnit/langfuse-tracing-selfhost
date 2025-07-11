@@ -632,9 +632,9 @@ class WorkflowMonitor:
 
 ## Next Steps
 
-- **[LLM Examples](llm.qmd)** - AI-specific patterns
-- **[Basic Examples](basic.qmd)** - Simple tracing patterns
-- **[Python Integration](../instrumentation/python.qmd)** - Implementation details
+- **[Basic Python Tracing](basic.qmd)** - Core instrumentation patterns
+- **[LLM Examples](llm.qmd)** - AI-specific tracing patterns
+- **[Quick Start Guide](../quickstart.qmd)** - Getting started
 
 ---
 

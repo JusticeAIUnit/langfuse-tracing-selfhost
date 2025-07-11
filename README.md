@@ -1,5 +1,7 @@
 # LangFuse Tracing at Justice AI
 
+Access the site live on [GitHub Pages](https://justiceaiunit.github.io/langfuse-tracing-selfhost/)
+
 Documentation website for using and deploying self-hosted LangFuse to trace applications and workflows.
 
 ## 🚀 Quick Start

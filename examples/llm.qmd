@@ -432,9 +432,9 @@ def assess_response_quality(content: str) -> float:
 
 ## Next Steps
 
-- **[Workflow Examples](workflow.qmd)** - Multi-step AI processes
-- **[Basic Examples](basic.qmd)** - General tracing patterns
-- **[Python Integration](../instrumentation/python.qmd)** - Detailed setup
+- **[Basic Python Tracing](basic.qmd)** - Core instrumentation patterns
+- **[Complex Workflows](workflow.qmd)** - Multi-step processes
+- **[Quick Start Guide](../quickstart.qmd)** - Getting started
 
 ---
 
