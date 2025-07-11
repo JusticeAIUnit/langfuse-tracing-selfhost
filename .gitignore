@@ -103,3 +103,25 @@ __pypackages__/
 
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,pythonvanilla
+
+# Quarto
+/.quarto/
+/_site/
+/docs/
+*.qmd.html
+*.qmd.pdf
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
