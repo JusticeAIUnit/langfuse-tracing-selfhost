@@ -1,9 +1,9 @@
 ---
-title: "Troubleshooting Guide"
-categories: ["Debugging", "Infrastructure"]
+title: "Deployment Troubleshooting"
+categories: ["Deployment", "Infrastructure"]
 ---
 
-This guide helps resolve common issues with LangFuse deployment and usage.
+This guide helps resolve common issues with LangFuse deployment and infrastructure.
 
 ## Deployment Issues
 
