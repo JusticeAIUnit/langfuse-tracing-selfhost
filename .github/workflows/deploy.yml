@@ -15,15 +15,12 @@ jobs:
     - name: Set up Quarto
       uses: quarto-dev/quarto-actions/setup@9e48da27e184aa238fcb49f5db75469626d43adb # v2.1.9
       with:
-        version: pre-release
+        version: 1.7.32
     
     - name: Install Node.js (for mermaid diagrams)
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version: '18'
-    
-    # - name: Install mermaid
-    #   run: npm install -g @mermaid-js/mermaid-cli
     
     - name: Render Quarto website
       run: quarto render
