@@ -23,8 +23,6 @@ website:
       - text: "Guides"
         menu:
           - text: "─── Application Tracing ───"
-          - text: "LLM Applications"
-            file: how-to/llm.qmd
           - text: "LangFuse Python SDK"
             file: how-to/python-sdk.qmd
           - text: "OpenTelemetry Library"

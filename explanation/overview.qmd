@@ -72,7 +72,22 @@ Ready to add observability to your AI applications?
 
 1. **[Quick Start Guide](../tutorials/quickstart.qmd)** - Learn by doing (Tutorial)
 2. **[Basic Python Tracing](../tutorials/basic.qmd)** - Step-by-step learning (Tutorial)
-3. **[LLM Examples](../how-to/llm.qmd)** - Solve specific problems (How-to guides)
+
+## Where to Go Next
+
+Based on your experience level and goals:
+
+**New to LangFuse?**
+1. **[Quick Start](../tutorials/quickstart.qmd)** - Get tracing working in 5 minutes (Tutorial)
+2. **[Basic Python Patterns](../tutorials/basic.qmd)** - Learn by building (Tutorial)
+
+**Ready to Implement?**
+1. **[Python SDK Guide](../how-to/python-sdk.qmd)** - Full SDK capabilities (How-to guide)
+2. **[OpenTelemetry Guide](../how-to/opentelemetry.qmd)** - Standardized tracing (How-to guide)
+3. **[Raw Requests Guide](../how-to/raw-requests.qmd)** - Troubleshooting with HTTP (How-to guide)
+
+**Need Help?**
+- **[Deployment Troubleshooting](../how-to/troubleshooting.qmd)** - Common issues and solutions
 
 ## Architecture Overview
 

@@ -239,16 +239,12 @@ Using OpenTelemetry's GenAI semantic conventions ensures:
 - ❌ You want minimal setup overhead
 - ❌ You're prototyping or learning
 
-## Next Steps
+## What's Next?
 
-### **Continue Building**
-- **[LLM Applications](llm.qmd)** - Apply these patterns to LLM workflows
-- **[Basic Python Tracing](../tutorials/basic.qmd)** - Learn simpler approaches first
+Now that you understand OpenTelemetry tracing with LangFuse:
 
-### **Learn More**
-- **[OpenTelemetry GenAI Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/){target="_blank"}** - Full specification
-- **[LangFuse Python SDK](python-sdk.qmd)** - Alternative SDK-based approach
+- **[Python SDK](python-sdk.qmd)** - Use the convenient Python SDK
+- **[Raw Requests](raw-requests.qmd)** - Troubleshoot with HTTP requests
+- **[Deployment Troubleshooting](troubleshooting.qmd)** - Solve common deployment issues
 
----
-
-*OpenTelemetry provides the most comprehensive and standards-based approach to AI observability. Use it for production applications where interoperability and rich context are important.* 
+*🌟 You're ready to implement standardized, vendor-neutral tracing!* 

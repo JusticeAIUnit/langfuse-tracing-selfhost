@@ -61,7 +61,9 @@ To run the website locally:
 │   ├── quickstart.qmd     # Quick start guide
 │   └── basic.qmd          # Core instrumentation and basic patterns
 ├── how-to/                # Problem-oriented content
-│   ├── llm.qmd            # LLM applications with OpenAI, LangChain
+│   ├── python-sdk.qmd    # LangFuse Python SDK
+│   ├── raw-requests.qmd  # Raw HTTP requests
+│   ├── opentelemetry.qmd # OpenTelemetry integration
 │   ├── azure.qmd          # Azure deployment guide
 │   ├── config.qmd         # Environment configuration
 │   └── troubleshooting.qmd # Common issues and solutions

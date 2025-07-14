@@ -193,20 +193,16 @@ Congratulations! You've successfully:
 - ✅ Viewed traces in the dashboard
 - ✅ Tried manual tracing for more control
 
-## Next Steps
+## What's Next?
 
-Now that you understand the basics, you can:
+Now that you've successfully traced your first request, you can:
 
-### **Continue Learning (Tutorials)**
-- **[Basic Python Tracing](basic.qmd)** - Learn more patterns and techniques
+- **[Python SDK Guide](../how-to/python-sdk.qmd)** - Learn the full SDK capabilities
+- **[Raw Requests Guide](../how-to/raw-requests.qmd)** - Use HTTP requests directly
+- **[OpenTelemetry Guide](../how-to/opentelemetry.qmd)** - Implement standardized tracing
+- **[Deployment Troubleshooting](../how-to/troubleshooting.qmd)** - Solve common deployment issues
 
-### **Solve Specific Problems (How-to Guides)**
-- **[LLM Application Tracing](../how-to/llm.qmd)** - Add tracing to AI applications
-
-### **Get Help**
-- **Examples**: Check out our [comprehensive Python examples](basic.qmd)
-- **LLM Integration**: See [LLM-specific patterns](../how-to/llm.qmd)
-- **Support**: Contact the Justice AI team for assistance
+*🎉 You've completed the LangFuse quickstart! Choose your next step based on your integration needs.*
 
 ## Common Issues
 

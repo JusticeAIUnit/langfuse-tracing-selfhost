@@ -164,14 +164,14 @@ Unlike the Python SDK, raw requests show you:
 
 Once you've identified and fixed the issue, switch back to the Python SDK.
 
-## Next Steps
+## What's Next?
 
-### **If This Solved Your Issue**
-- **[Basic Python Tracing](../tutorials/basic.qmd)** - Return to using the SDK
-- **[LLM Applications](llm.qmd)** - Apply tracing to your AI applications
+Now that you understand raw HTTP tracing:
 
-### **If Issues Persist**
-- **[Troubleshooting Guide](troubleshooting.qmd)** - More debugging techniques
-- **[Environment Configuration](config.qmd)** - Verify your setup
+- **[Python SDK](python-sdk.qmd)** - Use the convenient Python SDK
+- **[OpenTelemetry](opentelemetry.qmd)** - Implement standardized tracing
+- **[Deployment Troubleshooting](troubleshooting.qmd)** - Solve common deployment issues
+
+*🔧 You're ready to implement HTTP-based tracing in any language!*
 
 ---

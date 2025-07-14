@@ -132,15 +132,12 @@ Switch to **[raw HTTP requests](raw-requests.qmd)** when:
 - You're troubleshooting authentication or connectivity issues
 - You need to understand the underlying API structure
 
-## Next Steps
+## What's Next?
 
-### **Continue Building**
-- **[LLM Applications](llm.qmd)** - Apply SDK tracing to AI applications
-- **[Basic Python Tracing](../tutorials/basic.qmd)** - Learn more SDK patterns
+Now that you know the Python SDK fundamentals:
 
-### **If You Need Raw Control**
-- **[Raw HTTP Requests](raw-requests.qmd)** - Debug with direct API calls
+- **[Raw Requests](raw-requests.qmd)** - Use HTTP requests directly
+- **[OpenTelemetry](opentelemetry.qmd)** - Implement standardized tracing
+- **[Deployment Troubleshooting](troubleshooting.qmd)** - Solve common deployment issues
 
----
-
-*The LangFuse Python SDK provides the best balance of control and convenience for production applications. Use it for reliable, maintainable tracing implementations.* 
+*🎯 You're ready to implement comprehensive SDK-based tracing!* 

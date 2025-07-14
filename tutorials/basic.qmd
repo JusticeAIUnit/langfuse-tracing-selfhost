@@ -544,14 +544,13 @@ Try these exercises to reinforce your learning:
 4. **Monitor resource usage** in a data processing function
 5. **Set up conditional tracing** based on user roles
 
-## Next Steps
+## What's Next?
 
-### **Continue Learning**
-- **[Quick Start Guide](quickstart.qmd)** - Review the basics if needed
+Now that you understand the fundamentals, explore these guides:
 
-### **Solve Real Problems**
-- **[LLM Applications](../how-to/llm.qmd)** - Apply tracing to AI applications
+- **[Python SDK](../how-to/python-sdk.qmd)** - Learn the full SDK capabilities
+- **[Raw Requests](../how-to/raw-requests.qmd)** - Use HTTP requests directly
+- **[OpenTelemetry](../how-to/opentelemetry.qmd)** - Implement standardized tracing
+- **[Deployment Troubleshooting](../how-to/troubleshooting.qmd)** - Solve common deployment issues
 
----
-
-*You now have the foundation to implement comprehensive tracing in your Python applications. Practice with these patterns to build your expertise.* 
+*🚀 You're ready to implement comprehensive tracing in your applications!* 

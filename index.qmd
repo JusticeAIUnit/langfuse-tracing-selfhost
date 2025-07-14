@@ -89,9 +89,9 @@ LangFuse provides essential observability for AI applications, helping you:
 
 ## Quick Links
 
-- [Jump to Basic Examples →](tutorials/basic.qmd)
-- [See LLM Examples →](how-to/llm.qmd)
-- [Deploy Your Own Instance →](how-to/azure.qmd)
+- [Quick Start Tutorial →](tutorials/quickstart.qmd)
+- [View All Guides →](how-to/python-sdk.qmd)
+- [Understanding LangFuse →](explanation/overview.qmd)
 
 ---
 
