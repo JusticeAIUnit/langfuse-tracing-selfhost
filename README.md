@@ -62,7 +62,6 @@ To run the website locally:
 │   └── basic.qmd          # Core instrumentation and basic patterns
 ├── how-to/                # Problem-oriented content
 │   ├── llm.qmd            # LLM applications with OpenAI, LangChain
-│   ├── workflow.qmd       # Complex workflows and batch processing
 │   ├── azure.qmd          # Azure deployment guide
 │   ├── config.qmd         # Environment configuration
 │   └── troubleshooting.qmd # Common issues and solutions

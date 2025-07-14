@@ -82,7 +82,7 @@ Practical solutions for specific challenges:
 
 LangFuse provides essential observability for AI applications, helping you:
 
-- **Debug Complex Workflows** - Trace execution paths through multi-step AI processes
+- **Debug Multi-Step Processes** - Trace execution paths through AI workflows
 - **Monitor Performance** - Track latency, token usage, and costs across your AI stack
 - **Improve Quality** - Identify issues in prompts, responses, and model behavior
 - **Ensure Compliance** - Maintain audit trails for AI decision-making processes

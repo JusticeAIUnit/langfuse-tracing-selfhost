@@ -201,7 +201,6 @@ Now that you understand the basics, you can:
 
 ### **Solve Specific Problems (How-to Guides)**
 - **[LLM Application Tracing](../how-to/llm.qmd)** - Add tracing to AI applications
-- **[Complex Workflow Monitoring](../how-to/workflow.qmd)** - Trace multi-step processes
 
 ### **Get Help**
 - **Examples**: Check out our [comprehensive Python examples](basic.qmd)

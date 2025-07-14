@@ -25,8 +25,6 @@ website:
           - text: "─── Application Tracing ───"
           - text: "LLM Applications"
             file: how-to/llm.qmd
-          - text: "Complex Workflows"
-            file: how-to/workflow.qmd
           - text: "─── Debugging & Troubleshooting ───"
           - text: "Tracing With the requests Library"
             file: how-to/raw-requests.qmd

@@ -551,7 +551,6 @@ Try these exercises to reinforce your learning:
 
 ### **Solve Real Problems**
 - **[LLM Applications](../how-to/llm.qmd)** - Apply tracing to AI applications
-- **[Complex Workflows](../how-to/workflow.qmd)** - Trace multi-step processes
 
 ---
 
