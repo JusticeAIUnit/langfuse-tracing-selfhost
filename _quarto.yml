@@ -25,6 +25,8 @@ website:
           - text: "─── Application Tracing ───"
           - text: "LLM Applications"
             file: how-to/llm.qmd
+          - text: "Tracing With the LangFuse Python Library"
+            file: how-to/python-sdk.qmd
           - text: "Tracing With the requests Library"
             file: how-to/raw-requests.qmd
           - text: "─── Infrastructure & Deployment ───"

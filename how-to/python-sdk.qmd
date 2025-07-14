@@ -1,0 +1,146 @@
+---
+title: "Tracing With The `langfuse` Python Library"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "how-to"
+  purpose: "Problem-oriented - implementing traces using the official Python SDK"
+categories: ["Application Tracing", "Python"]
+---
+
+::: {.callout-note icon="false"}
+**🛠️ How-to Guide** - This guide shows you how to implement comprehensive tracing using the official LangFuse Python SDK with full control over trace structure and metadata.
+:::
+
+# Using the LangFuse Python SDK for Detailed Tracing
+
+**Problem**: You need precise control over your traces, spans, and metadata while maintaining the reliability and features of the official LangFuse Python SDK.
+
+**Solution**: Use the LangFuse Python SDK's decorator-based tracing with the `@observe` decorator. This approach provides excellent control over trace structure while benefiting from automatic retries, error handling, and SDK features.
+
+## When to Use This Approach
+
+Use the LangFuse Python SDK when:
+
+- ✅ **Production applications** - Need reliable trace delivery with retries
+- ✅ **Complex workflows** - Require nested spans and detailed metadata
+- ✅ **Team collaboration** - Want standardized tracing patterns
+- ✅ **Maintenance** - Benefit from SDK updates and improvements
+- ✅ **Development speed** - Focus on application logic, not HTTP details
+
+## Complete Example: Decorator-Based Tracing
+
+Here's a complete example that creates both trace and span data using the LangFuse Python SDK with the `@observe` decorator:
+
+```python
+from getpass import getuser
+import time
+import uuid
+
+from dotenv import dotenv_values
+from langfuse import Langfuse, observe
+
+# Load environment variables
+secrets = dotenv_values()
+
+# Initialize LangFuse client
+langfuse = Langfuse(
+    public_key=secrets["PUBLIC_KEY"],
+    secret_key=secrets["SECRET_KEY"],
+    host=secrets["LANGFUSE_HOST"]
+)
+
+def main():
+    session_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    span_id = str(uuid.uuid4())
+    
+    username = getuser()
+
+    print("--- Creating Trace ---")
+    print(f"✅ Trace ID: {trace_id}")
+    print(f"✅ Session ID: {session_id}")
+    print(f"✅ User: {username}")
+    
+    # Step 1: Execute the function we want to trace
+    def translate_text():
+        input_text = "Hello, world!"
+        translated = "Bonjour le monde"
+        print("Translating:", input_text)
+        print("Translated:", translated)
+        return input_text, translated
+    
+    # Start timing (same as test_requests.py)
+    start_time = time.time()
+    # Simulated task
+    input_text, output_text = translate_text()
+    end_time = time.time()
+    # measure latency
+    duration_ms = int((end_time - start_time) * 1000)
+
+    print(f"\n--- Creating Span ---")
+    print(f"✅ Span ID: {span_id}")
+    print(f"✅ Duration: {duration_ms}ms")
+    
+
+    @observe(name="manual-translate-trace")
+    def create_trace():
+        # Create a span within the trace
+        return create_translation_span(input_text, output_text, duration_ms, span_id)
+    
+    @observe(name="translate-function")
+    def create_translation_span(input_text, output_text, duration_ms, span_id):
+        return {
+            "input": {"text": input_text},
+            "output": {"translated": output_text},
+            "duration_ms": duration_ms,
+            "span_id": span_id
+        }
+    
+    # Execute the traced functions
+    create_trace()
+    
+    print(f"✅ Trace created with span")
+    
+    # Step 2: Ensure all data is sent
+    print("\n--- Flushing Data ---")
+    langfuse.flush()
+    print("✅ All traces flushed to LangFuse")
+    
+    return {
+        "trace_id": trace_id,
+        "span_id": span_id,
+        "session_id": session_id,
+        "result": output_text,
+        "duration_ms": duration_ms,
+        "user_id": username
+    }
+
+if __name__ == "__main__":
+    result = main()
+    print(f"\n📊 Summary: {result}")
+
+```
+
+## When to Use Raw HTTP Requests
+
+Switch to **[raw HTTP requests](raw-requests.qmd)** when:
+
+- You need to see exact HTTP status codes and error messages
+- The SDK is hiding important debugging information
+- You're troubleshooting authentication or connectivity issues
+- You need to understand the underlying API structure
+
+## Next Steps
+
+### **Continue Building**
+- **[LLM Applications](llm.qmd)** - Apply SDK tracing to AI applications
+- **[Basic Python Tracing](../tutorials/basic.qmd)** - Learn more SDK patterns
+
+### **If You Need Raw Control**
+- **[Raw HTTP Requests](raw-requests.qmd)** - Debug with direct API calls
+
+---
+
+*The LangFuse Python SDK provides the best balance of control and convenience for production applications. Use it for reliable, maintainable tracing implementations.* 
