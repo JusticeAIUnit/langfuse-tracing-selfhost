@@ -1,5 +1,6 @@
 ---
 title: "Troubleshooting Guide"
+categories: ["Debugging", "Infrastructure"]
 ---
 
 This guide helps resolve common issues with LangFuse deployment and usage.
@@ -156,6 +157,8 @@ print(f"Host: {os.getenv('LANGFUSE_HOST')}")
 print(f"Public Key: {os.getenv('LANGFUSE_PUBLIC_KEY')[:8]}...")
 print(f"Secret Key: {'*' * len(os.getenv('LANGFUSE_SECRET_KEY'))}")
 ```
+
+**Advanced Debugging**: If the Python SDK isn't providing clear error messages, try **[Raw HTTP Requests](raw-requests.qmd)** to see exact HTTP responses and debug authentication issues.
 
 ### Rate Limiting
 

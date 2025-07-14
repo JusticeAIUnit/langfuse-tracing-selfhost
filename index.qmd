@@ -7,8 +7,9 @@ listing:
     sort: ["title desc"]
     sort-ui: [title]
     filter-ui: true
+    categories: true
     page-size: 6
-    fields: [image, title, reading-time, description]
+    fields: [image, title, categories, reading-time, description]
     image-height: 50px
     image-placeholder: "https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/light-bulb.svg"
     table-striped: true
@@ -20,8 +21,9 @@ listing:
     sort: ["title desc"]
     sort-ui: [title]
     filter-ui: true
+    categories: true
     page-size: 6
-    fields: [image, title, reading-time, description]
+    fields: [image, title, categories, reading-time, description]
     image-height: 50px
     image-placeholder: "https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/academic-cap.svg"
     table-striped: true
@@ -33,8 +35,9 @@ listing:
     sort: ["title desc"]
     sort-ui: [title]
     filter-ui: true
+    categories: true
     page-size: 9
-    fields: [image, title, reading-time, description]
+    fields: [image, title, categories, reading-time, description]
     image-height: 50px
     image-placeholder: "https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/wrench-screwdriver.svg"
     table-striped: true

@@ -6,6 +6,7 @@ format:
 diataxis:
   type: "how-to"
   purpose: "Problem-oriented - practical solutions for tracing complex multi-step workflows"
+categories: ["Application Tracing", "Python"]
 ---
 
 ::: {.callout-note icon="false"}
@@ -131,6 +132,8 @@ result = processor.process_document("legal_document.pdf", user_id="analyst_123")
 **Solution**: Use session-based tracing to group related conversation turns.
 
 ```python
+import uuid
+
 class ConversationHandler:
     """Handle multi-turn conversations with context tracking."""
     
@@ -141,7 +144,8 @@ class ConversationHandler:
     def start_conversation(self, user_id: str) -> str:
         """Start a new conversation session."""
         
-        session_id = f"session_{user_id}_{int(time.time())}"
+        # Generate session ID with same UUID format as trace ID and span ID
+        session_id = str(uuid.uuid4())
         
         self.sessions[session_id] = {
             "user_id": user_id,

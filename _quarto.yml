@@ -22,16 +22,21 @@ website:
             file: tutorials/basic.qmd
       - text: "Problem Solving"
         menu:
+          - text: "─── Application Tracing ───"
           - text: "LLM Applications"
             file: how-to/llm.qmd
           - text: "Complex Workflows"
             file: how-to/workflow.qmd
+          - text: "─── Debugging & Troubleshooting ───"
+          - text: "Tracing With the requests Library"
+            file: how-to/raw-requests.qmd
+          - text: "Troubleshooting"
+            file: how-to/troubleshooting.qmd
+          - text: "─── Infrastructure & Deployment ───"
           - text: "Azure Deployment"
             file: how-to/azure.qmd
           - text: "Environment Config"
             file: how-to/config.qmd
-          - text: "Troubleshooting"
-            file: how-to/troubleshooting.qmd
     right:
       - icon: github
         href: https://github.com/JusticeAIUnit/langfuse-tracing-selfhost

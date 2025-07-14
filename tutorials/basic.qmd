@@ -6,6 +6,7 @@ format:
 diataxis:
   type: "tutorial"
   purpose: "Learning-oriented - step-by-step lessons for mastering Python tracing patterns"
+categories: ["Getting Started", "Python"]
 ---
 
 ::: {.callout-tip icon="false"}
@@ -430,15 +431,18 @@ print(f"Resource usage: {result}")
 ### Exercise 8: Session Tracking
 
 ```python
+import uuid
+
 class UserSession:
     """Track user sessions with LangFuse."""
     
-    def __init__(self, user_id: str, session_id: str):
+    def __init__(self, user_id: str, session_id: str = None):
         self.user_id = user_id
-        self.session_id = session_id
+        # Generate session ID with same format as trace ID and span ID
+        self.session_id = session_id or str(uuid.uuid4())
         self.trace = langfuse.trace(
             name="user_session",
-            session_id=session_id,
+            session_id=self.session_id,
             user_id=user_id,
             tags=["session", "user_interaction"]
         )
@@ -449,7 +453,7 @@ class UserSession:
         # Simulate query processing
         response = f"Response to: {query}"
         
-        # Add session context
+        # Add session context - same session ID for all traces in this session
         langfuse.trace(
             name="session_query",
             session_id=self.session_id,
@@ -466,13 +470,13 @@ class UserSession:
         self.trace.update(output={"session_ended": True})
         return {"session_ended": True}
 
-# Try the session tracking
-session = UserSession("user_123", "session_456")
-response1 = session.process_query("What is AI?")
-response2 = session.process_query("How does ML work?")
-session.end_session()
+# Try the session tracking with UUID format
+session = UserSession("user_123")  # Auto-generates UUID session ID
+print(f"Session ID: {session.session_id}")  # Will show UUID format
 
-print(f"Session responses: {response1}, {response2}")
+# Or provide your own session ID
+custom_session = UserSession("user_456", str(uuid.uuid4()))
+print(f"Custom Session ID: {custom_session.session_id}")
 ```
 
 **What you learned:** You can track user sessions and group related traces together for better analysis.

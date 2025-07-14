@@ -1,5 +1,6 @@
 ---
 title: "Azure Deployment Guide"
+categories: ["Infrastructure", "Azure"]
 ---
 
 This guide covers deploying your own LangFuse instance on Azure infrastructure.

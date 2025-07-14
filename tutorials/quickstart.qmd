@@ -6,6 +6,7 @@ format:
 diataxis:
   type: "tutorial"
   purpose: "Learning-oriented - hands-on lesson to get you started with LangFuse"
+categories: ["Getting Started", "Python"]
 ---
 
 ::: {.callout-tip icon="false"}

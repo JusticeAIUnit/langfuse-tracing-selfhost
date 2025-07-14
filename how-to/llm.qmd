@@ -6,6 +6,7 @@ format:
 diataxis:
   type: "how-to"
   purpose: "Problem-oriented - practical solutions for tracing LLM applications"
+categories: ["Application Tracing", "Python"]
 ---
 
 ::: {.callout-note icon="false"}

@@ -1,5 +1,6 @@
 ---
 title: "Environment Configuration"
+categories: ["Infrastructure", "Configuration"]
 ---
 
 This guide covers detailed configuration options for your LangFuse deployment.

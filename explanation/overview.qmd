@@ -6,6 +6,7 @@ format:
 diataxis:
   type: "explanation"
   purpose: "Understanding-oriented - provides context and background about LangFuse"
+categories: ["Concepts"]
 ---
 
 ::: {.callout-note icon="false"}
