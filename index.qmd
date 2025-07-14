@@ -1,5 +1,45 @@
 ---
 title: "LangFuse Tracing at Justice AI"
+listing:
+  - id: explanation-listing
+    contents: explanation/
+    type: table
+    sort: ["title desc"]
+    sort-ui: [title]
+    filter-ui: true
+    page-size: 6
+    fields: [image, title, reading-time, description]
+    image-height: 50px
+    image-placeholder: "https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/light-bulb.svg"
+    table-striped: true
+    table-hover: true
+    max-description-length: 100
+  - id: tutorials-listing
+    contents: tutorials/
+    type: table
+    sort: ["title desc"]
+    sort-ui: [title]
+    filter-ui: true
+    page-size: 6
+    fields: [image, title, reading-time, description]
+    image-height: 50px
+    image-placeholder: "https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/academic-cap.svg"
+    table-striped: true
+    table-hover: true
+    max-description-length: 100
+  - id: howto-listing
+    contents: how-to/
+    type: table
+    sort: ["title desc"]
+    sort-ui: [title]
+    filter-ui: true
+    page-size: 9
+    fields: [image, title, reading-time, description]
+    image-height: 50px
+    image-placeholder: "https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/wrench-screwdriver.svg"
+    table-striped: true
+    table-hover: true
+    max-description-length: 100
 ---
 
 This site provides comprehensive guidance for implementing observability and tracing in your AI applications using LangFuse.
@@ -19,20 +59,21 @@ Each page clearly indicates its type, helping you find exactly what you need whe
 
 ### 📚 **Explanation** - *Understanding-oriented*
 Context and background to deepen your knowledge:
-- [What is LangFuse?](explanation/overview.qmd) - Understand the benefits, capabilities, and architecture
+
+::: {#explanation-listing}
+:::
 
 ### 🎓 **Tutorials** - *Learning-oriented*
 Step-by-step lessons to build your skills:
-- [Quick Start Guide](tutorials/quickstart.qmd) - Get up and running in 5 minutes
-- [Basic Python Tracing](tutorials/basic.qmd) - Master core instrumentation patterns
+
+::: {#tutorials-listing}
+:::
 
 ### 🛠️ **How-to Guides** - *Problem-oriented*
 Practical solutions for specific challenges:
-- [LLM Application Tracing](how-to/llm.qmd) - Solve OpenAI, LangChain, and RAG tracing problems
-- [Complex Workflow Tracing](how-to/workflow.qmd) - Handle multi-step processes and batch operations
-- [Azure Deployment](how-to/azure.qmd) - Set up your own LangFuse instance
-- [Environment Configuration](how-to/config.qmd) - Configure your deployment properly
-- [Troubleshooting](how-to/troubleshooting.qmd) - Fix common deployment issues
+
+::: {#howto-listing}
+:::
 
 ## Why Use LangFuse?
 
