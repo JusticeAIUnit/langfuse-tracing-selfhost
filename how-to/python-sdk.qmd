@@ -1,5 +1,5 @@
 ---
-title: "Tracing With The `langfuse` Python Library"
+title: "Tracing With The `langfuse` Python SDK"
 format:
   html:
     toc: true

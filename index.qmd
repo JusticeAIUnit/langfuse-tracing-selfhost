@@ -51,9 +51,9 @@ This site provides comprehensive guidance for implementing observability and tra
 
 This documentation follows the [Diátaxis](https://diataxis.fr/) framework, which organizes content based on what you need to accomplish:
 
+- **📚 Explanation** - *Understanding-oriented* - Context and background knowledge
 - **🎓 Tutorials** - *Learning-oriented* - Step-by-step lessons for building skills
 - **🛠️ How-to Guides** - *Problem-oriented* - Practical solutions for specific challenges  
-- **📚 Explanation** - *Understanding-oriented* - Context and background knowledge
 - **📋 Reference** - *Information-oriented* - Technical specifications and details
 
 Each page clearly indicates its type, helping you find exactly what you need whether you're learning, working, or seeking to understand.

@@ -186,6 +186,7 @@ if __name__ == "__main__":
 ## What You've Learned
 
 Congratulations! You've successfully:
+
 - ✅ Installed the LangFuse SDK
 - ✅ Set up your environment variables
 - ✅ Created your first traced function
