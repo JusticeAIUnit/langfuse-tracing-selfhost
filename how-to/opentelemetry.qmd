@@ -1,0 +1,254 @@
+---
+title: "Tracing With The `opentelemetry` Library"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "how-to"
+  purpose: "Problem-oriented - implementing standards-based tracing for AI applications"
+categories: ["Application Tracing", "Python", "OpenTelemetry"]
+---
+
+::: {.callout-note icon="false"}
+**🛠️ How-to Guide** - This guide shows you how to implement standards-based tracing using OpenTelemetry semantic conventions for generative AI systems with LangFuse.
+:::
+
+# Using OpenTelemetry for AI Application Tracing
+
+**Problem**: You want to implement standardized, vendor-neutral tracing for your AI applications that follows industry conventions and can be easily understood by other developers and tools.
+
+**Solution**: Use OpenTelemetry with the [semantic conventions for generative AI systems](https://opentelemetry.io/docs/specs/semconv/gen-ai/){target="_blank"} to create consistent, standardized traces that work with LangFuse and other observability platforms.
+
+## Why Use OpenTelemetry for AI Tracing?
+
+### **Standards-Based Approach**
+- ✅ **Industry standard** - OpenTelemetry is the Cloud Native Computing Foundation (CNCF, a subsiduary of the Linux Foundation) standard for observability
+- ✅ **Semantic conventions** - Standardized attribute names for AI operations
+- ✅ **Vendor neutral** - Works with multiple observability backends
+- ✅ **Future-proof** - Evolves with the industry
+
+### **Rich AI Context**
+- ✅ **Model tracking** - Standardized attributes for model name, version, parameters
+- ✅ **Token usage** - Consistent input/output token measurement
+- ✅ **Tool calls** - Structured tracing for AI tool/function usage
+- ✅ **Conversation flow** - Proper prompt/completion tracking
+
+## Complete Example: OpenAI Chat Completion
+
+Here's a complete example that traces an OpenAI chat completion using OpenTelemetry semantic conventions:
+
+```python
+import os
+import time
+import uuid
+from base64 import b64encode
+from getpass import getuser
+
+from dotenv import dotenv_values
+from openai import OpenAI
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import resources
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.trace import Status, StatusCode
+
+# Load environment variables
+secrets = dotenv_values()
+
+# Setup OpenTelemetry to export to LangFuse
+def setup_telemetry():
+    """Configure OpenTelemetry to send traces to LangFuse."""
+    
+    # Create authentication string
+    auth_string = b64encode(
+        f"{secrets['PUBLIC_KEY']}:{secrets['SECRET_KEY']}".encode()
+    ).decode()
+    
+    # Configure OTLP via environment variables (like the working application)
+    os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
+        secrets['LANGFUSE_HOST'] + "/api/public/otel"
+    )
+    os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = (
+        f"Authorization=Basic {auth_string}"
+    )
+    
+    # Create exporter using environment variables
+    exporter = OTLPSpanExporter()
+    
+    # Create tracer provider with service information
+    resource = resources.Resource.create({
+        "service.name": "ai-tracing-demo",
+        "service.version": "1.0.0"
+    })
+    
+    # Create provider and add span processor
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    
+    # Set the tracer provider
+    trace.set_tracer_provider(provider)
+    
+    return trace.get_tracer(__name__)
+
+def trace_openai_completion():
+    """Example function that traces an OpenAI completion with semantic conventions."""
+    
+    # Setup telemetry
+    tracer = setup_telemetry()
+    
+    # Generate session and conversation context
+    session_id = str(uuid.uuid4())
+    username = getuser()
+    
+    # Initialize OpenAI client
+    client = OpenAI(api_key=secrets["OPENAI_API_KEY"])
+    
+    # Create main span for the AI operation
+    with tracer.start_as_current_span("openai_chat_completion") as span:
+        
+        # Set standardized GenAI attributes
+        span.set_attributes({
+            # LangFuse session tracking
+            "langfuse.session.id": session_id,
+            "user.id": username,
+            
+            # OpenTelemetry GenAI semantic conventions
+            "gen_ai.system": "openai",
+            "gen_ai.operation.name": "chat.completions",
+            "gen_ai.request.model": "gpt-3.5-turbo",
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.max_tokens": 150,
+        })
+        
+        # Prepare the conversation
+        messages = [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "Explain machine learning in simple terms."}
+        ]
+        
+        # Add prompt attributes using semantic conventions
+        for i, message in enumerate(messages):
+            span.set_attributes({
+                f"gen_ai.prompt.{i}.role": message["role"],
+                f"gen_ai.prompt.{i}.content": message["content"]
+            })
+        
+        try:
+            # Time the API call
+            start_time = time.time()
+            
+            # Make the OpenAI API call
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                temperature=0.7,
+                max_tokens=150
+            )
+            
+            end_time = time.time()
+            
+            # Set response attributes using semantic conventions
+            span.set_attributes({
+                "gen_ai.response.id": response.id,
+                "gen_ai.response.model": response.model,
+                "gen_ai.response.finish_reason": response.choices[0].finish_reason,
+                "gen_ai.usage.input_tokens": response.usage.prompt_tokens,
+                "gen_ai.usage.output_tokens": response.usage.completion_tokens,
+                "gen_ai.usage.total_tokens": response.usage.total_tokens,
+                
+                # Performance metrics
+                "gen_ai.response.duration_ms": int((end_time - start_time) * 1000),
+                
+                # Response content
+                "gen_ai.completion.0.role": response.choices[0].message.role,
+                "gen_ai.completion.0.content": response.choices[0].message.content
+            })
+            
+            # Add events for key milestones
+            span.add_event("request_sent", {
+                "timestamp": start_time,
+                "model": "gpt-3.5-turbo"
+            })
+            
+            span.add_event("response_received", {
+                "timestamp": end_time,
+                "tokens_used": response.usage.total_tokens
+            })
+            
+            # Set successful status
+            span.set_status(Status(StatusCode.OK))
+            
+            return {
+                "response": response.choices[0].message.content,
+                "usage": response.usage.model_dump(),
+                "session_id": session_id
+            }
+            
+        except Exception as e:
+            # Set error status and attributes
+            span.set_status(Status(StatusCode.ERROR, str(e)))
+            span.set_attributes({
+                "error.type": type(e).__name__,
+                "error.message": str(e)
+            })
+            span.add_event("error_occurred", {
+                "error.type": type(e).__name__,
+                "error.message": str(e)
+            })
+            raise
+
+if __name__ == "__main__":
+    result = trace_openai_completion()
+    print(f"AI Response: {result['response']}")
+    print(f"Token Usage: {result['usage']}")
+    print(f"Session ID: {result['session_id']}")
+    
+```
+
+## Key Benefits of This Approach
+
+### **Standardized Attributes**
+Using OpenTelemetry's GenAI semantic conventions ensures:
+- **Consistent naming** - `gen_ai.request.model` instead of custom names
+- **Interoperability** - Works with any OpenTelemetry-compatible backend
+- **Community support** - Follows industry standards
+
+### **Rich Context**
+- **Model information** - Track model versions, parameters, and capabilities
+- **Token usage** - Monitor costs and performance across different models
+- **Tool tracking** - Understand how AI agents use tools and functions
+- **Error handling** - Standardized error attributes and status codes
+
+### **Vendor Flexibility**
+- **Multi-backend** - Switch between LangFuse, Jaeger, or other providers
+- **Future-proof** - OpenTelemetry evolves with the observability ecosystem
+- **No vendor lock-in** - Standard attributes work everywhere
+
+## When to Use This Approach
+
+**Use OpenTelemetry when:**
+- ✅ You want industry-standard observability
+- ✅ You need multi-vendor compatibility
+- ✅ You're building production AI applications
+- ✅ You want rich semantic context for AI operations
+- ✅ You need to comply with observability standards
+
+**Use SDK-specific approaches when:**
+- ❌ You only need basic tracing for development
+- ❌ You want minimal setup overhead
+- ❌ You're prototyping or learning
+
+## Next Steps
+
+### **Continue Building**
+- **[LLM Applications](llm.qmd)** - Apply these patterns to LLM workflows
+- **[Basic Python Tracing](../tutorials/basic.qmd)** - Learn simpler approaches first
+
+### **Learn More**
+- **[OpenTelemetry GenAI Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/){target="_blank"}** - Full specification
+- **[LangFuse Python SDK](python-sdk.qmd)** - Alternative SDK-based approach
+
+---
+
+*OpenTelemetry provides the most comprehensive and standards-based approach to AI observability. Use it for production applications where interoperability and rich context are important.* 

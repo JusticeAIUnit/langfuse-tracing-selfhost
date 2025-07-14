@@ -27,6 +27,8 @@ website:
             file: how-to/llm.qmd
           - text: "Tracing With the LangFuse Python Library"
             file: how-to/python-sdk.qmd
+          - text: "Tracing With the OpenTelemetry Library"
+            file: how-to/opentelemetry.qmd
           - text: "Tracing With the requests Library"
             file: how-to/raw-requests.qmd
           - text: "─── Infrastructure & Deployment ───"
