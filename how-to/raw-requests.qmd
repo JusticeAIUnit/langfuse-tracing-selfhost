@@ -1,0 +1,177 @@
+---
+title: "Tracing With The `requests` Library"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "how-to"
+  purpose: "Problem-oriented - troubleshooting trace sending issues with raw HTTP requests"
+categories: ["Debugging", "Python"]
+---
+
+::: {.callout-note icon="false"}
+**🛠️ How-to Guide** - This guide helps you troubleshoot trace sending issues by using raw HTTP requests instead of the Python SDK.
+:::
+
+# Raw HTTP Requests for Troubleshooting
+
+**Problem**: Sometimes the Python LangFuse SDK can obscure HTTP exceptions, making it difficult to diagnose why traces aren't being sent. You need to see the raw HTTP response to understand what's going wrong.
+
+**Solution**: Use raw HTTP requests to send traces directly to the LangFuse API. This approach gives you complete visibility into HTTP status codes, error messages, and request/response details.
+
+## When to Use This Approach
+
+Use raw HTTP requests when:
+
+- ✅ **Traces aren't appearing** in your LangFuse dashboard
+- ✅ **SDK exceptions are unclear** or don't provide enough detail
+- ✅ **Network issues suspected** - you need to see exact HTTP responses
+- ✅ **Authentication problems** - verify your keys and endpoints work
+- ✅ **Debugging new deployments** - test connectivity before using the SDK
+
+
+## Complete Example: Manual Trace Sending
+
+Here's a complete example that sends both trace and span data using raw requests:
+
+```python
+from getpass import getuser
+import json
+import time
+import uuid
+
+from dotenv import dotenv_values
+import requests
+
+# Load environment variables
+secrets = dotenv_values()
+auth = requests.auth.HTTPBasicAuth(secrets["PUBLIC_KEY"], secrets["SECRET_KEY"])
+HEADERS = {"Content-Type": "application/json"}
+
+def main():
+    # Generate IDs for the observability hierarchy
+    session_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    span_id = str(uuid.uuid4())
+    
+    usernm = getuser()
+    
+    # Step 1: Send the trace (represents complete workflow)
+    print("--- Sending Trace ---")
+    trace_payload = {
+        "id": trace_id,
+        "name": "manual-translate-trace",
+        "userId": usernm,
+        "sessionId": session_id,  # Link to user session
+        "release": "debug-script",
+        "source": "python-requests",
+        "metadata": {
+            "info": "Manual trace test from raw request"
+        }
+    }
+    
+    try:
+        response = requests.post(
+            f"{secrets['LANGFUSE_HOST']}/api/public/traces",
+            headers=HEADERS,
+            data=json.dumps(trace_payload),
+            auth=auth,
+            timeout=10
+        )
+        print(f"Trace Response [{response.status_code}]: {response.text}")
+        
+        # Check for success
+        if response.status_code not in [200, 201]:
+            print(f"❌ Trace failed with status {response.status_code}")
+            return
+        else:
+            print("✅ Trace sent successfully")
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Trace request failed: {e}")
+        return
+    
+    # Step 2: Execute the function we want to trace
+    def translate_text():
+        input_text = "Hello, world!"
+        translated = "Bonjour le monde"
+        print(f"Translating: {input_text}")
+        print(f"Translated: {translated}")
+        return input_text, translated
+    
+    # Time the function execution
+    start_time = time.time()
+    input_text, output_text = translate_text()
+    end_time = time.time()
+    duration_ms = int((end_time - start_time) * 1000)
+    
+    # Step 3: Send the span (represents one step in the workflow)
+    print("\n--- Sending Span ---")
+    span_payload = {
+        "id": span_id,
+        "traceId": trace_id,
+        "sessionId": session_id,
+        "name": "translate-function",
+        "userId": usernm,
+        "input": {"text": input_text},
+        "output": {"translated": output_text},
+        "startTime": time.strftime(
+            '%Y-%m-%dT%H:%M:%S.000Z', time.gmtime(start_time)
+            ),
+        "endTime": time.strftime(
+            '%Y-%m-%dT%H:%M:%S.000Z', time.gmtime(end_time)
+            ),
+        "metadata": {
+            "duration_ms": duration_ms
+        }
+    }
+    
+    try:
+        response = requests.post(
+            f"{secrets['LANGFUSE_HOST']}/api/public/spans",
+            headers=HEADERS,
+            data=json.dumps(span_payload),
+            auth=auth,
+            timeout=10
+        )
+        print(f"Span Response [{response.status_code}]: {response.text}")
+        
+        # Check for success
+        if response.status_code not in [200, 201]:
+            print(f"❌ Span failed with status {response.status_code}")
+        else:
+            print("✅ Span sent successfully")
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Span request failed: {e}")
+
+if __name__ == "__main__":
+    main()
+
+```
+
+## What This Approach Reveals
+
+Unlike the Python SDK, raw requests show you:
+
+1. **Exact HTTP status codes** - Know precisely what's failing
+2. **Complete error messages** - See detailed validation errors  
+3. **Request timing** - Identify network latency issues
+4. **Authentication details** - Verify credentials are working
+5. **Payload validation** - See exactly which fields are problematic
+
+## When to Switch Back to the SDK
+
+Once you've identified and fixed the issue, switch back to the Python SDK.
+
+## Next Steps
+
+### **If This Solved Your Issue**
+- **[Basic Python Tracing](../tutorials/basic.qmd)** - Return to using the SDK
+- **[LLM Applications](llm.qmd)** - Apply tracing to your AI applications
+
+### **If Issues Persist**
+- **[Troubleshooting Guide](troubleshooting.qmd)** - More debugging techniques
+- **[Environment Configuration](config.qmd)** - Verify your setup
+
+---
