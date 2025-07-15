@@ -1,0 +1,83 @@
+---
+title: "Self-Hosted LangFuse"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "explanation"
+  purpose: "Understanding-oriented - provides context about self-hosting LangFuse and deployment approaches"
+categories: ["Concepts", "Infrastructure & Deployment"]
+---
+
+::: {.callout-note icon="false"}
+**📚 Explanation** - This page explains the concept of self-hosting LangFuse, why it matters for data governance, and the spectrum of deployment approaches available.
+:::
+
+# Understanding Self-Hosted LangFuse
+
+Self-hosting LangFuse means running your own instance of the LangFuse observability platform within your organization's infrastructure, rather than using a cloud-hosted service managed by a third party.
+
+## What is Self-Hosting?
+
+**Self-hosting** puts you in complete control of your LangFuse deployment:
+
+- ✅ **Your infrastructure** - Runs on servers you control
+- ✅ **Your data** - All traces and analytics stay within your environment  
+- ✅ **Your security** - You implement and manage all security measures
+- ✅ **Your compliance** - Meet specific regulatory and organizational requirements
+
+## Why Self-Host LangFuse?
+
+### **Data Governance & Sovereignty**
+
+For government and enterprise organizations, self-hosting ensures your AI interaction data stays within your geographic boundaries and organizational control, meeting GDPR, data protection, and sovereignty requirements. Self-hosting also eliminates third-party access to sensitive AI workloads, allowing you to implement custom security policies and comply with government, industry, and internal regulatory standards.
+
+### **Operational Control**
+
+Self-hosting provides complete control over configuration, integrations, and update scheduling, allowing you to tune performance and connect with internal systems on your timeline. You also gain predictable cost structures and resource optimization opportunities, potentially reducing long-term expenses compared to usage-based pricing models.
+
+
+
+## Focus of This Documentation
+
+The guidance provided in this documentation specifically targets **enterprise-grade Azure deployment** using:
+
+- ✅ **Azure Kubernetes Service (AKS)** - Production-ready container orchestration
+- ✅ **Application Gateway** - Enterprise load balancing and SSL termination
+- ✅ **Azure Database for PostgreSQL** - Managed, highly available database
+- ✅ **Terraform automation** - Infrastructure-as-code for repeatability
+- ✅ **Automated SSL certificates** - Let's Encrypt with cert-manager
+- ✅ **Email integration** - Azure Communication Services for notifications
+
+This approach provides:
+
+- **High availability** and fault tolerance
+- **Enterprise security** and compliance features
+- **Scalability** to handle large AI workloads
+- **Operational maturity** with monitoring and automation
+
+## Alternatives Self-Hosting Approaches
+
+A lower-grade Deployment of langfuse is available via
+[Docker Compose](https://langfuse.com/self-hosting/docker-compose){target="blank"}
+with virtual machines, although this will not allow for https protocol and
+therefore is only really suitable for testing. 
+
+Microsoft also provides some documentation for deploying LangFuse to [Azure Container Apps](https://learn.microsoft.com/en-us/samples/azure-samples/langfuse-on-azure/langfuse-on-azure/){target="blank"} and [also on GitHub](https://github.com/Azure-Samples/langfuse-on-azure){target="blank"}. 
+
+## Getting Started with Self-Hosting
+
+Ready to deploy your own LangFuse instance?
+
+**For Enterprise Azure Deployment:**
+
+1. **[Azure Deployment Guide](../how-to/azure-deployment.qmd)** - Complete production setup
+2. **[SSL Configuration](../how-to/ssl-certificates.qmd)** - Trusted certificates
+3. **[Email Notifications](../how-to/email-notifications.qmd)** - User management
+
+**For Understanding LangFuse:**
+- **[What is LangFuse?](overview.qmd)** - Core concepts and capabilities
+
+---
+
+*Self-hosting LangFuse gives you complete control over your AI observability platform while meeting the strictest data governance and compliance requirements.* 
