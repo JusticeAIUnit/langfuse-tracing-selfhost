@@ -1,0 +1,326 @@
+---
+title: "Configuring SSL Certificates"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "how-to"
+  purpose: "Problem-oriented - Configure trusted SSL certificates for production LangFuse deployment"
+categories: ["Infrastructure & Deployment", "SSL", "Security"]
+---
+
+::: {.callout-note icon="false"}
+**🛠️ How-to Guide** - This guide shows you how to configure trusted SSL certificates using Let's Encrypt for your LangFuse deployment.
+:::
+
+# Configuring SSL Certificates for LangFuse
+
+**Problem**: Your LangFuse deployment uses self-signed certificates that cause browser warnings and prevent proper API access.
+
+**Solution**: Configure automatic SSL certificate management using Let's Encrypt and cert-manager to provide trusted certificates that auto-renew.
+
+## Why SSL Certificates Are Critical
+
+**Without proper SSL certificates, LangFuse tracing will likely fail because:**
+
+- ✅ **Client applications** validate SSL certificates when sending traces
+- ✅ **Modern browsers** block mixed content (HTTP traces to HTTPS LangFuse)
+- ✅ **SDKs and libraries** require trusted certificates for secure connections
+- ✅ **API authentication** depends on secure TLS connections
+
+By default, the LangFuse Terraform module creates **self-signed certificates** which are rejected by browsers and applications.
+
+## MoJ SSL Certificate Policy
+
+According to MoJ guidance, **Let's Encrypt is approved and encouraged** for automated certificate management:
+
+✅ **Complies with MoJ policy** (automated certificates preferred)  
+✅ **Eliminates manual renewal overhead**  
+✅ **Prevents unexpected certificate expiry**  
+✅ **Uses industry-standard ACME protocol**  
+
+📋 **Official Policy Reference:** [MoJ Security Guidance - Automated Certificate Renewal](https://security-guidance.service.justice.gov.uk/automated-certificate-renewal/#automated-certificate-renewal){target="_blank"}
+
+## Prerequisites
+
+Before configuring SSL certificates:
+
+- ✅ **LangFuse deployed** on Azure with Terraform
+- ✅ **DNS delegation configured** with NS records (not A records)
+- ✅ **kubectl access** to your AKS cluster
+- ✅ **Domain resolving** to your Application Gateway IP
+
+::: {.callout-warning}
+**DNS Delegation Required**: This process requires proper NS record delegation to Azure DNS.
+:::
+
+## Step-by-Step SSL Setup
+
+### 1. Install cert-manager
+
+cert-manager automates SSL certificate provisioning and renewal in Kubernetes:
+
+```bash
+# Get AKS credentials
+az aks get-credentials --resource-group <YOUR_RESOURCE_GROUP> --name aks-<YOUR_DEPLOYMENT_NAME> --overwrite-existing
+
+# Install cert-manager (use latest version)
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.15.3/cert-manager.yaml
+
+# Verify installation
+kubectl get pods -n cert-manager
+```
+
+Wait for all cert-manager pods to be `Running`:
+```bash
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=cert-manager -n cert-manager --timeout=120s
+```
+
+**What this does:** Installs the cert-manager controller which automatically requests, validates, and renews SSL certificates from Let's Encrypt.
+
+### 2. Configure Azure DNS Permissions
+
+cert-manager needs permission to create DNS TXT records for domain validation:
+
+```bash
+# Get your AKS cluster's managed identity client ID
+AKS_CLIENT_ID=$(az aks show --resource-group <YOUR_RESOURCE_GROUP> --name aks-<YOUR_DEPLOYMENT_NAME> --query "identityProfile.kubeletidentity.clientId" -o tsv)
+
+# Grant DNS Zone Contributor permission
+az role assignment create \
+  --assignee $AKS_CLIENT_ID \
+  --role "DNS Zone Contributor" \
+  --scope "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.Network/dnsZones/<YOUR_DOMAIN_NAME>"
+```
+
+**What this does:** Allows cert-manager to create temporary DNS TXT records that Let's Encrypt uses to verify you own the domain.
+
+### 3. Create Let's Encrypt ClusterIssuer
+
+Create a file called `letsencrypt-clusterissuer.yaml`:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: certificates@digital.justice.gov.uk  # As per MoJ guidance
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - dns01:
+        azureDNS:
+          resourceGroupName: <YOUR_RESOURCE_GROUP>
+          hostedZoneName: <YOUR_DOMAIN_NAME>
+          subscriptionID: your-subscription-id
+          managedIdentity:
+            clientID: "your-aks-client-id"
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: certificates@digital.justice.gov.uk
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+    - dns01:
+        azureDNS:
+          resourceGroupName: <YOUR_RESOURCE_GROUP>
+          hostedZoneName: <YOUR_DOMAIN_NAME>
+          subscriptionID: your-subscription-id
+          managedIdentity:
+            clientID: "your-aks-client-id"
+```
+
+**Replace the placeholders:**
+```bash
+# Get your values
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+AKS_CLIENT_ID=$(az aks show --resource-group <YOUR_RESOURCE_GROUP> --name aks-<YOUR_DEPLOYMENT_NAME> --query "identityProfile.kubeletidentity.clientId" -o tsv)
+
+# Replace in the file, then apply
+kubectl apply -f letsencrypt-clusterissuer.yaml
+```
+
+**What this does:** Creates two certificate issuers - one for testing (staging) and one for production. The staging issuer has higher rate limits for testing.
+
+### 4. Request SSL Certificate (Staging First)
+
+Create a file called `langfuse-certificate.yaml`:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: langfuse-tls
+  namespace: langfuse
+spec:
+  secretName: langfuse-tls-secret
+  issuerRef:
+    name: letsencrypt-staging  # Start with staging to test
+    kind: ClusterIssuer
+  dnsNames:
+  - <YOUR_DOMAIN_NAME>
+```
+
+Apply the certificate request:
+```bash
+kubectl apply -f langfuse-certificate.yaml
+```
+
+**What this does:** Requests a Let's Encrypt certificate for your domain. The certificate will be stored as a Kubernetes secret.
+
+### 5. Monitor Certificate Issuance
+
+```bash
+# Check certificate status
+kubectl get certificate -n langfuse
+
+# Check detailed certificate status
+kubectl describe certificate langfuse-tls -n langfuse
+
+# Check ACME challenges (DNS validation)
+kubectl get challenges -n langfuse
+
+# Verify DNS TXT record was created
+az network dns record-set txt list --resource-group <YOUR_RESOURCE_GROUP> --zone-name <YOUR_DOMAIN_NAME> --output table
+```
+
+**Expected progression:**
+
+1. **Certificate**: `Ready=False`, `Reason=Issuing`
+2. **Challenge**: DNS TXT record appears in Azure DNS
+3. **Certificate**: `Ready=True` (usually within 2-10 minutes)
+
+### 6. Switch to Production Certificate
+
+Once staging works (certificate shows `Ready=True`), switch to production:
+
+```bash
+# Edit the certificate to use production issuer
+kubectl patch certificate langfuse-tls -n langfuse --type='json' -p='[{"op": "replace", "path": "/spec/issuerRef/name", "value": "letsencrypt-prod"}]'
+
+# Monitor the new certificate (wait for READY: True)
+kubectl get certificate langfuse-tls -n langfuse -w
+```
+
+**What this does:** Requests a trusted production certificate instead of the staging certificate.
+
+### 7. Configure Ingress to Use Let's Encrypt Certificate
+
+Update your LangFuse ingress to use the trusted certificate:
+
+```bash
+# Remove the Key Vault certificate annotation
+kubectl patch ingress langfuse -n langfuse --type='json' -p='[{"op": "remove", "path": "/metadata/annotations/appgw.ingress.kubernetes.io~1appgw-ssl-certificate"}]'
+
+# Add TLS configuration to use Let's Encrypt certificate
+kubectl patch ingress langfuse -n langfuse --type='json' -p='[{"op": "add", "path": "/spec/tls", "value": [{"hosts": ["<YOUR_DOMAIN_NAME>"], "secretName": "langfuse-tls-secret"}]}]'
+
+# Wait for Application Gateway to update (30-60 seconds)
+sleep 60
+```
+
+**What this does:** 
+
+- Removes the annotation forcing Application Gateway to use the self-signed Key Vault certificate
+- Configures the ingress to use the Let's Encrypt certificate
+- Allows the Application Gateway to serve the trusted SSL certificate
+
+## SSL Certificate Validation
+
+Test your new SSL certificate:
+
+```bash
+# Test SSL certificate
+curl -I https://<YOUR_DOMAIN_NAME>
+
+# Check certificate details
+openssl s_client -connect <YOUR_DOMAIN_NAME>:443 -servername <YOUR_DOMAIN_NAME> </dev/null 2>/dev/null | openssl x509 -noout -text | grep -A 1 "Issuer:"
+```
+
+**Expected results:**
+
+- **✅ Production certificate**: `Issuer: C=US, O=Let's Encrypt, CN=R10`
+- **❌ Staging certificate**: `Issuer: C=US, O=(STAGING) Let's Encrypt, CN=(STAGING) Wannabe Watercress R11`
+
+**Browser test:**
+- Navigate to `https://<YOUR_DOMAIN_NAME>`
+- Should show a green lock icon with no security warnings
+
+## Certificate Renewal
+
+cert-manager automatically renews certificates before expiry (typically 30 days before expiration):
+
+```bash
+# Check certificate expiry
+kubectl get certificate langfuse-tls -n langfuse -o jsonpath='{.status.notAfter}'
+
+# Check renewal events
+kubectl get events -n langfuse | grep -i certificate
+
+# Force renewal test (optional)
+kubectl patch certificate langfuse-tls -n langfuse --type='json' -p='[{"op": "replace", "path": "/metadata/annotations/cert-manager.io~1force-renewal", "value": "true"}]'
+```
+
+## Troubleshooting SSL Issues
+
+### Certificate Not Issued
+
+**Problem**: Certificate remains `Ready=False` for more than 10 minutes
+
+**Solutions:**
+```bash
+# Check challenge status
+kubectl describe challenges -n langfuse
+
+# Check DNS permissions
+az role assignment list --assignee $(az aks show --resource-group <YOUR_RESOURCE_GROUP> --name aks-<YOUR_DEPLOYMENT_NAME> --query "identityProfile.kubeletidentity.clientId" -o tsv) --output table
+
+# Check DNS zone exists
+az network dns zone show --resource-group <YOUR_RESOURCE_GROUP> --name <YOUR_DOMAIN_NAME>
+```
+
+### Browser Still Shows Warnings
+
+**Problem**: Browser shows "Not Secure" or certificate warnings
+
+**Solutions:**
+```bash
+# Ensure using production issuer
+kubectl get certificate langfuse-tls -n langfuse -o jsonpath='{.spec.issuerRef.name}'
+
+# Check ingress is using correct certificate
+kubectl get ingress langfuse -n langfuse -o yaml | grep -A 5 tls
+```
+
+### Application Errors
+
+**Problem**: LangFuse API returns SSL errors
+
+**Solutions:**
+```bash
+# Test API endpoint directly
+curl -v https://<YOUR_DOMAIN_NAME>/api/public/health
+
+# Check certificate chain
+openssl s_client -showcerts -connect <YOUR_DOMAIN_NAME>:443
+```
+
+## Next Steps
+
+Now that you have trusted SSL certificates:
+
+- **[Set Up Email Notifications](email-notifications.qmd)** - Enable user invitations and notifications
+- **[Deployment Troubleshooting](deployment-troubleshooting.qmd)** - Common deployment issues
+
+---
+
+*🔒 Your LangFuse deployment now has trusted SSL certificates that automatically renew!* 

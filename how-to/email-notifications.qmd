@@ -1,0 +1,382 @@
+---
+title: "Setting Up Email Notifications"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "how-to"
+  purpose: "Problem-oriented - Configure SMTP for LangFuse user invitations and notifications"
+categories: ["Infrastructure & Deployment", "Email", "Azure"]
+---
+
+::: {.callout-note icon="false"}
+**🛠️ How-to Guide** - This guide shows you how to configure email notifications using Azure Communication Services SMTP for user onboarding and system notifications.
+:::
+
+# Setting Up Email Notifications for LangFuse
+
+**Problem**: Your LangFuse deployment cannot send emails for user invitations, password resets, or system notifications, preventing colleague onboarding.
+
+**Solution**: Configure Azure Communication Services SMTP to enable email functionality for user management and notifications.
+
+## Why Email Configuration Matters
+
+LangFuse requires SMTP configuration to send transactional emails for:
+
+- ✅ **User invitations** to projects and organizations
+- ✅ **Password reset** functionality  
+- ✅ **Batch export completion** notifications
+- ✅ **Account verification** and other notifications
+
+Without email configuration, you cannot invite colleagues to your LangFuse instance or provide proper user management features.
+
+## Azure Communication Services Benefits
+
+**Why Azure Communication Services SMTP:**
+
+- ✅ **Integrated with Azure** - Native Azure service with proper authentication
+- ✅ **High deliverability** - Microsoft's email infrastructure and reputation
+- ✅ **Scalable** - Handles high-volume email requirements
+- ✅ **Secure** - Uses Entra ID (Azure AD) app registration for authentication
+- ✅ **Cost-effective** - Pay-per-use pricing model
+- ✅ **Compliance** - Meets enterprise security and compliance requirements
+
+## Prerequisites
+
+Before configuring SMTP:
+
+- ✅ **LangFuse deployed** on Azure with working SSL certificates
+- ✅ **Azure subscription** with Communication Services permissions
+- ✅ **Domain verified** in Azure DNS (same as your LangFuse domain)
+- ✅ **kubectl access** to your AKS cluster
+
+## Step-by-Step SMTP Configuration
+
+### 1. Create Communication Services Resource
+
+**Portal Navigation:**
+
+- Go to Azure Portal → Create Resource → Search "Communication Services"
+- Click "Create" on the Communication Services resource
+
+**Configuration:**
+
+- **Name**: `langfuse-ai-smtp` (or your preferred name)
+- **Subscription**: Your target subscription
+- **Resource Group**: Same as your LangFuse deployment
+- **Location**: Same region as your LangFuse deployment
+
+Click "Review + Create" and then "Create"
+
+### 2. Add and Verify Email Domain
+
+**Add Custom Domain:**
+
+- Go to the ACS resource → Email → Domains
+- Click "+ Add Custom Domain"
+- Enter your domain: `<YOUR_DOMAIN_NAME>`
+
+**Domain Verification:**
+
+- Azure will provide a TXT record for verification
+- Add this TXT record to your Azure DNS zone
+- Wait for verification (can take 5-15 minutes)
+- Verification status will show as "Verified" when complete
+
+```bash
+# Add verification TXT record to Azure DNS
+az network dns record-set txt add-record \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --zone-name <YOUR_DOMAIN_NAME> \
+  --record-set-name @ \
+  --value "your-verification-string"
+```
+
+### 3. Configure Email Authentication (SPF/DKIM)
+
+**Enable Email Authentication:**
+
+- Go to your domain settings → Click "Configure" next to SPF, DKIM, and DKIM2
+- Azure will provide specific DNS records for each authentication method
+
+**Add Records to Azure DNS:**
+
+```bash
+# SPF Record (replace with actual value from Azure)
+az network dns record-set txt add-record \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --zone-name <YOUR_DOMAIN_NAME> \
+  --record-set-name @ \
+  --value "v=spf1 include:_spf.azurecomm.net ~all"
+
+# DKIM Records (replace with actual values from Azure)
+az network dns record-set cname set-record \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --zone-name <YOUR_DOMAIN_NAME> \
+  --record-set-name selector1._domainkey \
+  --cname selector1._domainkey.your-domain.azurecomm.net
+
+az network dns record-set cname set-record \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --zone-name <YOUR_DOMAIN_NAME> \
+  --record-set-name selector2._domainkey \
+  --cname selector2._domainkey.your-domain.azurecomm.net
+```
+
+### 4. Register Entra Application
+
+**Create App Registration:**
+
+- Go to Azure AD (Microsoft Entra) → App Registrations → New registration
+- **Name**: `langfuse-smtp-client`
+- **Redirect URI**: Leave blank
+- Click "Register"
+
+**Create Client Secret:**
+
+- Go to Certificates & secrets → + New client secret
+- **Description**: "Langfuse SMTP Authentication"
+- **Expires**: Choose appropriate duration (e.g., 24 months)
+- Click "Add"
+
+::: {.callout-warning}
+**Important**: Copy both the secret value and secret ID immediately. You cannot retrieve the secret value later.
+:::
+
+**Record Key Information:**
+```bash
+# Save these values for later configuration
+APP_ID="your-app-client-id"           # From App Registration overview
+TENANT_ID="your-tenant-id"           # From App Registration overview  
+CLIENT_SECRET="your-client-secret"    # From the secret you just created
+```
+
+### 5. Assign Permissions to App Registration
+
+**Grant Communication Services Access:**
+
+```bash
+# Get your app registration object ID
+APP_OBJECT_ID=$(az ad app show --id $APP_ID --query objectId -o tsv)
+
+# Assign Contributor role to Communication Services resource
+az role assignment create \
+  --assignee $APP_OBJECT_ID \
+  --role "Contributor" \
+  --scope "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.Communication/CommunicationServices/langfuse-ai-smtp"
+```
+
+**Alternative: Portal Assignment:**
+
+- Go to Communication Services resource → Access control (IAM) → + Add → Add role assignment
+- Select "Contributor" role
+- Assign to your `langfuse-smtp-client` app registration
+
+### 6. Create SMTP Username
+
+**Generate SMTP Username:**
+
+- Go to the ACS resource → Email → SMTP Usernames
+- Click "+ Add"
+- Select the Entra App you registered (`langfuse-smtp-client`)
+
+::: {.callout-note}
+**Note**: The app must have direct assignment to the Communication Services resource to appear in the list.
+:::
+
+**Username Format:**
+The generated username will be in the format:
+```
+resource.appId.tenantId
+```
+
+### 7. Configure MailFrom Address
+
+**Set MailFrom Address:**
+
+- Go to ACS resource → Email → Domains → Your Domain → MailFrom addresses
+- Click "+ Add MailFrom address"
+- Enter: `DoNotReply` (this creates `DoNotReply@<YOUR_DOMAIN_NAME>`) or whatever you wish to use.
+- Click "Add"
+
+::: {.callout-warning}
+**Important**: The `EMAIL_FROM_ADDRESS` you [later configure in your LangFuse](#configure-langfuse-environment-variables)
+environment variablesmust match exactly what you configure here, including case sensitivity.
+:::
+
+### 8. Configure LangFuse Environment Variables 
+
+**Construct SMTP Connection URL:**
+
+```bash
+# Set your configuration values
+ACS_RESOURCE_NAME="langfuse-ai-smtp"
+APP_ID="your-app-client-id"
+TENANT_ID="your-tenant-id"
+CLIENT_SECRET="your-client-secret"
+MAILFROM_ADDRESS="<YOUR_MAILFROM_ADDRESS>@<YOUR_DOMAIN_NAME>"
+
+# Apply SMTP configuration to Langfuse deployment
+kubectl patch deployment langfuse-web -n langfuse --type='json' -p='[
+  {
+    "op": "add", 
+    "path": "/spec/template/spec/containers/0/env/-", 
+    "value": {
+      "name": "SMTP_CONNECTION_URL", 
+      "value": "smtp://'"$ACS_RESOURCE_NAME"'.'"$APP_ID"'.'"$TENANT_ID"':'"$CLIENT_SECRET"'@smtp.azurecomm.net:587/?pool=true&secure=false&requireTLS=true"
+    }
+  },
+  {
+    "op": "add", 
+    "path": "/spec/template/spec/containers/0/env/-", 
+    "value": {
+      "name": "EMAIL_FROM_ADDRESS", 
+      "value": "'"$MAILFROM_ADDRESS"'"
+    }
+  }
+]'
+```
+
+**SMTP Connection URL Format:**
+```
+smtp://<resource>.<appId>.<tenantId>:<clientSecret>@smtp.azurecomm.net:587/?pool=true&secure=false&requireTLS=true
+```
+
+### 9. Verify Configuration
+
+**Wait for pods to restart and verify:**
+
+```bash
+# Wait for pods to be ready
+kubectl wait --for=condition=ready pod -l app=web -n langfuse --timeout=60s
+
+# Verify SMTP environment variables are set
+kubectl exec -n langfuse deployment/langfuse-web -- printenv | grep -E "(SMTP|EMAIL)"
+```
+
+**Expected output:**
+```
+SMTP_CONNECTION_URL=smtp://langfuse-ai-smtp.app-id.tenant-id:client-secret@smtp.azurecomm.net:587/?pool=true&secure=false&requireTLS=true
+EMAIL_FROM_ADDRESS=<YOUR_MAILFROM_ADDRESS>@<YOUR_DOMAIN_NAME>
+```
+
+## Test Email Functionality
+
+### 1. Test User Invitation
+
+1. **Access your LangFuse instance**: `https://<YOUR_DOMAIN_NAME>`
+2. **Navigate to**: Settings → Members → Invite User
+3. **Enter a colleague's email address**
+4. **Click "Send Invitation"**
+
+### 2. Test Password Reset
+
+1. **Go to the login page**
+2. **Click "Forgot Password"**
+3. **Enter your email address**
+4. **Check if you receive the reset email**
+
+### 3. Monitor Email Logs
+
+```bash
+# Check for email-related logs
+kubectl logs deployment/langfuse-web -n langfuse --tail=100 | grep -i "email\|smtp\|mail"
+```
+
+**Successful email logs should show:**
+- SMTP connection established
+- Email sent successfully
+- No authentication errors
+
+## Troubleshooting Email Issues
+
+### SMTP Connection Errors
+
+**Problem**: `Error: connect ECONNREFUSED smtp.azurecomm.net:587`
+
+**Solutions:**
+```bash
+# Check network connectivity from AKS
+kubectl run test-smtp --image=busybox --rm -it --restart=Never -- nslookup smtp.azurecomm.net
+
+# Verify SMTP configuration
+kubectl exec -n langfuse deployment/langfuse-web -- printenv SMTP_CONNECTION_URL
+```
+
+### Authentication Errors
+
+**Problem**: `Error: Invalid login: 535 5.7.3 Authentication unsuccessful`
+
+**Solutions:**
+```bash
+# Verify app registration has correct permissions
+az role assignment list --assignee $APP_OBJECT_ID --output table
+
+# Check client secret is valid and not expired
+az ad app credential list --id $APP_ID --query "[].endDateTime" -o table
+```
+
+### Email Not Delivered
+
+**Problem**: Email appears to send but recipients don't receive it
+
+**Solutions:**
+```bash
+# Check SPF/DKIM records are configured
+az network dns record-set txt list --resource-group <YOUR_RESOURCE_GROUP> --zone-name <YOUR_DOMAIN_NAME> --output table
+
+# Verify MailFrom address matches configuration
+kubectl exec -n langfuse deployment/langfuse-web -- printenv EMAIL_FROM_ADDRESS
+```
+
+## Maintenance Notes
+
+::: {.callout-warning}
+**After Helm Upgrades**: Helm upgrades may overwrite the manual SMTP configuration. After any Helm upgrade, reapply the SMTP configuration using the kubectl patch commands above.
+:::
+
+**Create a maintenance script:**
+```bash
+#!/bin/bash
+# save as: reapply-smtp-config.sh
+
+ACS_RESOURCE_NAME="langfuse-ai-smtp"
+APP_ID="your-app-client-id"
+TENANT_ID="your-tenant-id"
+CLIENT_SECRET="your-client-secret"
+MAILFROM_ADDRESS="<YOUR_MAILFROM_ADDRESS>@<YOUR_DOMAIN_NAME>"
+
+kubectl patch deployment langfuse-web -n langfuse --type='json' -p='[
+  {
+    "op": "add", 
+    "path": "/spec/template/spec/containers/0/env/-", 
+    "value": {
+      "name": "SMTP_CONNECTION_URL", 
+      "value": "smtp://'"$ACS_RESOURCE_NAME"'.'"$APP_ID"'.'"$TENANT_ID"':'"$CLIENT_SECRET"'@smtp.azurecomm.net:587/?pool=true&secure=false&requireTLS=true"
+    }
+  },
+  {
+    "op": "add", 
+    "path": "/spec/template/spec/containers/0/env/-", 
+    "value": {
+      "name": "EMAIL_FROM_ADDRESS", 
+      "value": "'"$MAILFROM_ADDRESS"'"
+    }
+  }
+]'
+```
+
+## Next Steps
+
+Now that email notifications are configured:
+
+- **Invite colleagues** to your LangFuse instance
+- **Set up project-specific access** for different teams
+- **Configure batch export notifications** if needed
+
+For deployment issues, see:
+- **[Deployment Troubleshooting](deployment-troubleshooting.qmd)** - Common deployment issues
+
+---
+
+*📧 Your LangFuse deployment can now send emails for user onboarding and notifications!* 

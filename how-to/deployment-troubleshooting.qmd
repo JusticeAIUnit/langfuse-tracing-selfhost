@@ -1,0 +1,345 @@
+---
+title: "Deployment Troubleshooting"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "how-to"
+  purpose: "Problem-oriented - Diagnose and resolve common deployment issues"
+categories: ["Infrastructure & Deployment", "Troubleshooting"]
+---
+
+::: {.callout-note icon="false"}
+**🛠️ How-to Guide** - This guide helps you diagnose and resolve common issues encountered during LangFuse deployment on Azure.
+:::
+
+# Deployment Troubleshooting
+
+**Problem**: You're encountering errors during LangFuse deployment or post-deployment configuration.
+
+**Solution**: This comprehensive troubleshooting guide covers the most common deployment issues with specific solutions based on real deployment experience.
+
+::: {.callout-tip}
+**Quick Fix**: Most Azure deployment issues are timing-related and resolve with a simple retry after waiting 30-60 seconds.
+:::
+
+## Common Deployment Issues
+
+### Permission Errors
+
+**Error Pattern**: `StatusCode=403` or permission-related failures
+
+#### Key Vault Certificate Permissions
+
+**Error**: `Status=403 Code="Forbidden" Message="The user, group or application ... does not have certificates get/delete permission on key vault"`
+
+**Root Cause**: This occurs when:
+
+- Terraform needs to create/recreate/update certificates
+- The service principal lacks certificate management permissions
+- Key Vault RBAC model requires explicit permission assignment
+- New Key Vault created without proper access policies
+
+**Universal Solution:**
+```bash
+# Get the Key Vault name from current deployment
+KEYVAULT_NAME=$(terraform show -json | jq -r '.values.root_module.child_modules[] | select(.address=="module.langfuse") | .resources[] | select(.type=="azurerm_key_vault") | .values.name')
+
+# Add all certificate permissions to current user
+az keyvault set-policy --name $KEYVAULT_NAME --upn $(az account show --query user.name -o tsv) \
+  --certificate-permissions create delete get list update import backup restore recover purge
+
+# Verify permissions were added
+az keyvault show --name $KEYVAULT_NAME --query "properties.accessPolicies[?objectId=='$(az ad user show --id $(az account show --query user.name -o tsv) --query objectId -o tsv)'].permissions.certificates"
+```
+
+**Alternative: Manual Permission Assignment**
+```bash
+# If the above doesn't work, use your specific email
+az keyvault set-policy --name your-keyvault-name --upn your-email@justice.gov.uk \
+  --certificate-permissions create delete get list update import backup restore recover purge
+```
+
+**After Adding Permissions:**
+```bash
+sleep 30
+terraform apply -auto-approve
+```
+
+#### General Permission Propagation
+
+**Error**: Various `StatusCode=403` errors
+
+**Root Cause**: Azure permissions take time to propagate across services
+
+**Solution**: Wait for 30-60 seconds and retry.
+
+### Key Vault Issues
+
+#### Soft-Delete Conflicts
+
+**Error**: `Vault name 'your-vault-name' is already in use` or similar naming conflicts
+
+**Root Cause**: Azure Key Vault has soft-delete enabled by default. When Terraform recreates a Key Vault (e.g., due to domain changes), the old vault enters a "soft-deleted" state for 7 days.
+
+**Prevention**: Before changing domains that affect Key Vault names:
+```bash
+# 1. Get current Key Vault name from Terraform state
+CURRENT_VAULT=$(terraform show -json | jq -r '.values.root_module.child_modules[] | select(.address=="module.langfuse") | .resources[] | select(.type=="azurerm_key_vault") | .values.name')
+
+# 2. Delete the Key Vault before applying changes
+az keyvault delete --name $CURRENT_VAULT --resource-group <YOUR_RESOURCE_GROUP>
+
+# 3. Check for any soft-deleted conflicts
+az keyvault list-deleted --subscription $(az account show --query id -o tsv)
+
+# 4. Apply Terraform changes
+terraform apply -auto-approve
+```
+
+**Post-Conflict Resolution**: If you encounter the error after deployment:
+```bash
+# Check for soft-deleted vaults
+az keyvault list-deleted --subscription $(az account show --query id -o tsv)
+
+# If there's a naming conflict, either:
+# Option 1: Wait 7 days for automatic purge
+# Option 2: Change your domain/name to avoid conflict
+# Option 3: Use different random suffix (remove from state)
+terraform state rm module.langfuse.random_string.key_vault_postfix
+terraform apply -auto-approve
+```
+
+#### Key Vault Recovery Issues
+
+**Error**: `Vault name 'your-vault-name' is already in use`
+
+**Solution 1: Force new Key Vault name**
+```bash
+terraform state rm module.langfuse.random_string.key_vault_postfix
+terraform apply
+```
+
+**Solution 2: Purge existing vault**
+```bash
+az keyvault purge --name your-vault-name --location westeurope
+```
+
+### Naming and Resource Conflicts
+
+
+#### Resource Already Exists
+
+**Error**: `name.*already exists` or similar conflicts
+
+**Root Cause**: Resource names must be globally unique or conflict with soft-deleted resources
+
+**Solution**: Use different names or clean up existing resources
+```bash
+# Check for existing resources
+az resource list --resource-group <YOUR_RESOURCE_GROUP> --output table
+
+# Delete conflicting resources if safe
+az resource delete --resource-group <YOUR_RESOURCE_GROUP> --name conflicting-resource-name --resource-type Microsoft.KeyVault/vaults
+```
+
+### Application Gateway Issues
+
+#### Redirect Configuration Conflicts
+
+**Error**: `ConflictError.*redirectConfigurations` or AGIC-related errors
+
+**Root Cause**: Application Gateway Ingress Controller (AGIC) configuration conflicts
+
+**Solution**: Refresh and reapply
+```bash
+terraform refresh
+terraform apply -auto-approve
+```
+
+#### Backend Health Issues
+
+**Error**: 502 Bad Gateway errors
+
+**Diagnostic Steps:**
+```bash
+# Check AKS pods
+kubectl get pods -n langfuse
+
+# Check ingress configuration
+kubectl get ingress -n langfuse -o yaml
+
+# Check Application Gateway backend health
+az network application-gateway show-backend-health --resource-group <YOUR_RESOURCE_GROUP> --name lng-appgw
+```
+
+### DNS and SSL Issues
+
+#### DNS Propagation Delays
+
+**Problem**: Domain not resolving after deployment
+
+**Solution**: Wait and verify DNS propagation
+```bash
+# Test NS delegation
+nslookup -type=NS <YOUR_DOMAIN>
+
+# Test A record resolution
+nslookup <YOUR_DOMAIN>
+
+# Wait 5-30 minutes for global propagation
+```
+
+#### SSL Certificate Issues
+
+**Problem**: Browser shows "Not Secure" or certificate warnings
+
+**Diagnostic Steps:**
+```bash
+# Check certificate configuration
+kubectl get certificate -n langfuse
+
+# Check ingress TLS configuration
+kubectl get ingress langfuse -n langfuse -o yaml | grep -A 5 tls
+
+# Test SSL certificate
+openssl s_client -connect <YOUR_DOMAIN>:443 -servername <YOUR_DOMAIN>
+```
+
+### AKS and Kubernetes Issues
+
+#### Pod Startup Failures
+
+**Problem**: LangFuse pods not starting
+
+**Diagnostic Steps:**
+```bash
+# Check pod status
+kubectl get pods -n langfuse
+
+# Check pod logs
+kubectl logs -n langfuse deployment/langfuse-web --tail=50
+
+# Check events
+kubectl get events -n langfuse --sort-by='.lastTimestamp'
+```
+
+#### Resource Constraints
+
+**Problem**: Pods pending or resource-related errors
+
+**Solution**: Check and adjust resources
+```bash
+# Check node resources
+kubectl describe nodes
+
+# Check resource quotas
+kubectl describe resourcequota -n langfuse
+
+# Scale nodes if needed (via Terraform)
+# Update node_pool_max_count in main.tf
+```
+
+## Systematic Troubleshooting Approach
+
+### 1. Check Current State
+
+```bash
+# Verify Azure login and subscription
+az account show
+
+# Check resource group
+az group show --name <YOUR_RESOURCE_GROUP>
+
+# List all resources
+az resource list --resource-group <YOUR_RESOURCE_GROUP> --output table
+```
+
+### 2. Validate Terraform State
+
+```bash
+# Check Terraform state
+terraform show
+
+# Validate configuration
+terraform validate
+
+# Plan to see differences
+terraform plan
+```
+
+### 3. Monitor Resource Creation
+
+```bash
+# Watch resource creation in real-time
+watch -n 5 'az resource list --resource-group <YOUR_RESOURCE_GROUP> --query "[].{Name:name,Type:type,Status:provisioningState}" --output table'
+
+# Monitor specific resources
+watch -n 5 'az keyvault show --name your-vault-name --query "properties.provisioningState"'
+```
+
+### 4. Emergency Recovery
+
+```bash
+# Reset problematic resources
+terraform state rm module.langfuse.azurerm_key_vault.this
+terraform apply -auto-approve
+
+# Force resource recreation
+terraform taint module.langfuse.azurerm_application_gateway.this
+terraform apply -auto-approve
+```
+
+## Error Pattern Reference
+
+| Error Pattern | Common Cause | Solution |
+|---------------|-------------|----------|
+| `StatusCode=403` | Permission not propagated | Wait 30-60 seconds, retry |
+| `certificates delete permission` | Missing Key Vault permissions | Add certificate permissions via `az keyvault set-policy` |
+| `Vault name.*already in use` | Key Vault soft-delete conflict | Delete old Key Vault before domain changes |
+| `name.*already exists` | Resource name collision | Use different name or clean up existing |
+| `Cannot import non-existent` | Import block referencing deleted resource | Remove import block |
+| `exceeds.*character limit` | Name too long | Use shorter name parameter |
+| `MethodNotAllowed.*Purge` | Purge protection enabled | Use different name or disable protection |
+| `ConflictError.*already in use` | Soft-deleted resource | Purge or use different name |
+| `InvalidResourceReference.*redirectConfigurations` | AGIC configuration conflict | Run `terraform refresh`, then apply |
+
+## Best Practices for Troubleshooting
+
+### 1. Incremental Deployment
+
+For complex deployments, use targeted applies:
+```bash
+# Deploy infrastructure first
+terraform apply -target="module.langfuse.azurerm_resource_group.this"
+terraform apply -target="module.langfuse.azurerm_virtual_network.this"
+
+# Then security resources
+terraform apply -target="module.langfuse.azurerm_key_vault.this"
+sleep 60
+
+# Finally application resources
+terraform apply
+```
+
+### 2. Resource Monitoring
+
+```bash
+# Monitor deployment progress
+az resource list --resource-group <YOUR_RESOURCE_GROUP> \
+  --query "[?provisioningState!='Succeeded'].{Name:name,State:provisioningState}" \
+  --output table
+```
+
+### 3. Log Collection
+
+```bash
+# Collect deployment logs
+terraform apply -auto-approve 2>&1 | tee deployment.log
+
+# Collect Azure CLI debug info
+az resource list --resource-group <YOUR_RESOURCE_GROUP> --debug 2>&1 | tee azure-debug.log
+```
+---
+
+*🔧 Most deployment issues are temporary and resolve with patience and systematic troubleshooting.* 

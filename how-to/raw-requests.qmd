@@ -170,7 +170,7 @@ Now that you understand raw HTTP tracing:
 
 - **[Python SDK](python-sdk.qmd)** - Use the convenient Python SDK
 - **[OpenTelemetry](opentelemetry.qmd)** - Implement standardized tracing
-- **[Deployment Troubleshooting](troubleshooting.qmd)** - Solve common deployment issues
+- **[Azure Deployment](azure-deployment.qmd)** - Deploy your own LangFuse instance
 
 *🔧 You're ready to implement HTTP-based tracing in any language!*
 

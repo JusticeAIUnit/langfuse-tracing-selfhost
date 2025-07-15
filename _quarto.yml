@@ -31,11 +31,13 @@ website:
             file: how-to/raw-requests.qmd
           - text: "─── Infrastructure & Deployment ───"
           - text: "Azure Deployment"
-            file: how-to/azure.qmd
-          - text: "Environment Config"
-            file: how-to/config.qmd
+            file: how-to/azure-deployment.qmd
+          - text: "SSL Certificates"
+            file: how-to/ssl-certificates.qmd
+          - text: "Email Notifications"
+            file: how-to/email-notifications.qmd
           - text: "Deployment Troubleshooting"
-            file: how-to/troubleshooting.qmd
+            file: how-to/deployment-troubleshooting.qmd
     right:
       - icon: github
         href: https://github.com/JusticeAIUnit/langfuse-tracing-selfhost

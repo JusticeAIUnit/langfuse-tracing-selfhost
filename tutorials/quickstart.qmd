@@ -200,7 +200,7 @@ Now that you've successfully traced your first request, you can:
 - **[Python SDK Guide](../how-to/python-sdk.qmd)** - Learn the full SDK capabilities
 - **[Raw Requests Guide](../how-to/raw-requests.qmd)** - Use HTTP requests directly
 - **[OpenTelemetry Guide](../how-to/opentelemetry.qmd)** - Implement standardized tracing
-- **[Deployment Troubleshooting](../how-to/troubleshooting.qmd)** - Solve common deployment issues
+- **[Azure Deployment](../how-to/azure-deployment.qmd)** - Deploy your own LangFuse instance
 
 *🎉 You've completed the LangFuse quickstart! Choose your next step based on your integration needs.*
 

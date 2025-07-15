@@ -138,6 +138,6 @@ Now that you know the Python SDK fundamentals:
 
 - **[Raw Requests](raw-requests.qmd)** - Use HTTP requests directly
 - **[OpenTelemetry](opentelemetry.qmd)** - Implement standardized tracing
-- **[Deployment Troubleshooting](troubleshooting.qmd)** - Solve common deployment issues
+- **[Azure Deployment](azure-deployment.qmd)** - Deploy your own LangFuse instance
 
 *🎯 You're ready to implement comprehensive SDK-based tracing!* 

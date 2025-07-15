@@ -551,6 +551,6 @@ Now that you understand the fundamentals, explore these guides:
 - **[Python SDK](../how-to/python-sdk.qmd)** - Learn the full SDK capabilities
 - **[Raw Requests](../how-to/raw-requests.qmd)** - Use HTTP requests directly
 - **[OpenTelemetry](../how-to/opentelemetry.qmd)** - Implement standardized tracing
-- **[Deployment Troubleshooting](../how-to/troubleshooting.qmd)** - Solve common deployment issues
+- **[Azure Deployment](../how-to/azure-deployment.qmd)** - Deploy your own LangFuse instance
 
 *🚀 You're ready to implement comprehensive tracing in your applications!* 

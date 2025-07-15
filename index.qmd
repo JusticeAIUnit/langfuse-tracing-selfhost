@@ -90,7 +90,7 @@ LangFuse provides essential observability for AI applications, helping you:
 ## Quick Links
 
 - [Quick Start Tutorial →](tutorials/quickstart.qmd)
-- [View All Guides →](how-to/python-sdk.qmd)
+- [Start with Python SDK →](how-to/python-sdk.qmd)
 - [Understanding LangFuse →](explanation/overview.qmd)
 
 ---
