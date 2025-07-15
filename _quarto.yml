@@ -18,6 +18,8 @@ website:
             file: explanation/self-hosting.qmd
           - text: "Azure Architecture"
             file: explanation/azure-architecture.qmd
+          - text: "Observability Hierarchy"
+            file: explanation/observability-hierarchy.qmd
       - text: "Learning"
         menu:
           - text: "Quick Start"

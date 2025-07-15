@@ -1,0 +1,165 @@
+---
+title: "Understanding LangFuse Observability Hierarchy"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "explanation"
+  purpose: "Understanding-oriented - explains the three-level hierarchy of Sessions, Traces, and Spans in LangFuse"
+categories: ["Concepts", "Observability"]
+---
+
+::: {.callout-note icon="false"}
+**📚 Explanation** - This page explains how to structure your observability data using LangFuse's three-level hierarchy: Sessions, Traces, and Spans.
+:::
+
+# Understanding the LangFuse Observability Hierarchy
+
+Before implementing LangFuse in your AI applications, it's crucial to understand the three-level hierarchy that organizes your observability data. This structure helps you track everything from individual operations to entire user sessions.
+
+## The Three-Level Hierarchy
+
+LangFuse organizes observability data in a hierarchical structure:
+
+```{mermaid}
+graph LR
+    Session[🧑 Session ID<br/>User's entire interaction period]
+    
+    Session --> Trace1[📋 Trace ID #1<br/>Complete workflow or task]
+    Session --> Trace2[📋 Trace ID #2<br/>Complete workflow or task]
+    Session --> TraceN[📋 Trace ID #3<br/>Complete workflow or task]
+    
+    Trace1 --> Span1[⚡ Span: Retrieve documents]
+    Trace1 --> Span2[⚡ Span: Generate response]
+    Trace1 --> Span3[⚡ Span: Format output]
+    
+    Trace2 --> Span4[⚡ Span: Validate input]
+    Trace2 --> Span5[⚡ Span: Process query]
+    Trace2 --> Span6[⚡ Span: Return results]
+    
+    classDef sessionClass fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef traceClass fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef spanClass fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    
+    class Session sessionClass
+    class Trace1,Trace2,TraceN traceClass
+    class Span1,Span2,Span3,Span4,Span5,Span6 spanClass
+```
+
+## Session ID (Highest Level)
+
+### **Purpose**
+Groups related user interactions across multiple workflows, representing a continuous period of engagement.
+
+### **Examples**
+- **Chat Session**: User John's entire conversation lasting 30 minutes
+- **Document Analysis Session**: Processing multiple documents in one work session  
+- **Research Session**: User exploring various topics over an hour
+
+### **When to Create a New Session**
+- ✅ **New user login** or authentication
+- ✅ **Significant time gap** (e.g., user returns after hours)
+- ✅ **Different user** or context
+- ✅ **Fresh start** of a new work session
+
+### **When to Continue Existing Session**
+- ✅ **Related questions** in the same conversation
+- ✅ **Follow-up queries** within reasonable time
+- ✅ **Same user context** and goals
+
+## Trace ID (Middle Level)
+
+### **Purpose**
+Groups all steps of a single workflow or task, representing one complete operation from start to finish.
+
+### **Examples**
+- **Question Processing**: Handling "What is artificial intelligence?"
+- **Document Summarization**: Processing one specific document
+- **Translation Task**: Converting one piece of text to another language
+- **RAG Pipeline**: Retrieving relevant context and generating a response
+
+### **When to Create a New Trace**
+- ✅ **New user request** or question
+- ✅ **Different task type** (switching from chat to document analysis)
+- ✅ **Independent operation** that stands alone
+- ✅ **Error recovery** requiring a fresh start
+
+### **When to Continue Existing Trace**
+- ❌ **Generally avoid** - traces should represent complete, discrete operations
+- ❌ **Don't reuse** for different user requests
+
+## Span ID (Lowest Level)
+
+### **Purpose**
+Individual operations within a workflow, representing specific steps or components.
+
+### **Examples**
+- **"Retrieve documents"** from a vector database
+- **"Generate response"** using an LLM
+- **"Format output"** for display
+- **"Validate input"** for safety checks
+- **"Extract entities"** from user text
+
+### **When to Create Spans**
+- ✅ **Distinct operations** within your workflow
+- ✅ **External API calls** (OpenAI, database queries)
+- ✅ **Processing steps** you want to measure separately
+- ✅ **Error-prone operations** that need individual monitoring
+
+## Best Practices
+
+### **Session Management**
+
+- **Use consistent session IDs** throughout a user's interaction period
+- **Include user identifier** in session ID for easier tracking
+- **Set reasonable timeouts** (30-60 minutes of inactivity)
+- **Track session metadata** (user role, authentication level)
+
+### **Trace Design** 
+
+- **One trace per user request** - keep it simple and consistent
+- **Meaningful trace names** that describe the operation
+- **Include input/output data** at the trace level
+- **Capture errors and exceptions** properly
+
+### **Span Granularity**
+
+- **Focus on business logic** - span things you care about measuring
+- **Don't over-span** - avoid creating spans for trivial operations
+- **Consistent naming** across similar operations
+- **Include timing data** for performance analysis
+
+## Implementation Tips
+
+### **Generating IDs**
+- **UUIDs for uniqueness** across distributed systems
+- **Timestamps for ordering** and debugging
+- **Descriptive prefixes** for easier identification
+
+### **Metadata to Include**
+- **User context** (role, department, permissions)
+- **Request timing** (start time, duration)
+- **Model versions** (which LLM, embedding model used)
+- **Configuration** (temperature, max tokens, etc.)
+
+### **Error Handling**
+- **Capture partial success** when some spans succeed
+- **Include error context** in span/trace metadata
+- **Use status codes** to indicate success/failure
+
+## Next Steps
+
+Now that you understand the hierarchy:
+
+**Ready to Implement?**
+1. **[Quick Start Tutorial](../tutorials/quickstart.qmd)** - Get hands-on experience
+2. **[Basic Python Tracing](../tutorials/basic.qmd)** - Learn implementation patterns
+3. **[Python SDK Guide](../how-to/python-sdk.qmd)** - Full SDK capabilities
+
+**Want More Context?**
+- **[What is LangFuse?](overview.qmd)** - Core platform concepts
+- **[Self-Hosted LangFuse](self-hosting.qmd)** - Deployment options
+
+---
+
+*Understanding this hierarchy is key to getting the most value from your AI observability implementation.* 
