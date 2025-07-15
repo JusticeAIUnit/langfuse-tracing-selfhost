@@ -47,6 +47,10 @@ listing:
 
 This site provides comprehensive guidance for implementing observability and tracing in your AI applications using LangFuse.
 
+::: {.callout-note}
+This documentation has been created using AI assistance. If you notice any mistakes or have suggestions for improvement, please raise them as issues or submit a pull request via the GitHub link available in the top-right corner of this page.
+:::
+
 ## Documentation Framework
 
 This documentation follows the [Diátaxis](https://diataxis.fr/) framework, which organizes content based on what you need to accomplish:

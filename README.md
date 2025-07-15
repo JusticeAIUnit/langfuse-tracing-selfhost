@@ -22,11 +22,19 @@ The documentation is automatically deployed to GitHub Pages when changes are pus
 To run the website locally:
 
 1. **Install Quarto**
-   ```bash
-   # On macOS
-   brew install quarto
    
-   # Or download from https://quarto.org/docs/get-started/
+   **Important**: Use the same version as the GitHub Actions workflow to ensure consistent rendering:
+   
+   ```bash
+   # Install specific version (1.7.32) to match CI
+   # On macOS with Homebrew
+   brew install quarto@1.7.32
+   
+   # Or download version 1.7.32 specifically from:
+   # https://github.com/quarto-dev/quarto-cli/releases/tag/v1.7.32
+   
+   # Verify correct version
+   quarto --version  # Should show 1.7.32
    ```
 
 2. **Preview the Website**
@@ -36,12 +44,16 @@ To run the website locally:
    
    This will start a local server at `http://localhost:4000` with live reload.
 
-3. **Build the Website**
+3. **Build and Test Locally**
    ```bash
    quarto render
    ```
    
    This creates the static site in the `docs/` directory.
+
+::: {.callout-warning}
+**Always test locally before pushing to main!** Pushes to the main branch automatically trigger the GitHub Actions workflow that renders and deploys the site to GitHub Pages. Make sure your changes render correctly locally using `quarto preview` and `quarto render` before committing.
+:::
 
 ## 🛠️ Development
 
@@ -105,10 +117,21 @@ The website is configured via `_quarto.yml` with:
 
 ## 🚀 Deployment
 
-The website automatically deploys to GitHub Pages via GitHub Actions when:
-- Changes are pushed to the main branch
-- The workflow builds the site using Quarto
-- The static files are deployed to the `gh-pages` branch
+The website automatically deploys to GitHub Pages via GitHub Actions:
+
+- **Trigger**: Any push to the `main` branch automatically starts the deployment process
+- **Build Process**: The workflow uses Quarto 1.7.32 to render the site  
+- **Deployment**: Static files are deployed to the `gh-pages` branch and served via GitHub Pages
+- **Live Site**: Changes are visible at https://justiceaiunit.github.io/langfuse-tracing-selfhost/ within a few minutes
+
+**⚠️ Important**: Since deployment is automatic, always ensure your changes work correctly locally before pushing to main. Use `quarto preview` and `quarto render` to test your changes.
+
+### Manual Deployment
+
+If you need to manually trigger deployment:
+1. Navigate to the [Actions tab](https://github.com/JusticeAIUnit/langfuse-tracing-selfhost/actions) in GitHub
+2. Select the "Deploy Quarto Website" workflow
+3. Click "Run workflow" on the main branch
 
 ## 📞 Support
 
