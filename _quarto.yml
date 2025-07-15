@@ -16,6 +16,8 @@ website:
             file: explanation/overview.qmd
           - text: "Self-Hosted LangFuse"
             file: explanation/self-hosting.qmd
+          - text: "Azure Architecture"
+            file: explanation/azure-architecture.qmd
       - text: "Learning"
         menu:
           - text: "Quick Start"

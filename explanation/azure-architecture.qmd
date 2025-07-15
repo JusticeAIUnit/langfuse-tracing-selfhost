@@ -1,0 +1,142 @@
+---
+title: "Azure Architecture for LangFuse"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "explanation"
+  purpose: "Understanding-oriented - explains the Azure infrastructure components for LangFuse deployment"
+categories: ["Concepts", "Infrastructure & Deployment", "Azure"]
+---
+
+::: {.callout-note icon="false"}
+**📚 Explanation** - This page explains the Azure infrastructure components required for a production LangFuse deployment and how they work together.
+:::
+
+# Understanding Azure Architecture for LangFuse
+
+Before deploying LangFuse on Azure, it's helpful to understand the main infrastructure components that work together to create a production-ready observability platform.
+
+## Architecture Overview
+
+The LangFuse deployment uses several key Azure services that work together:
+
+```{mermaid}
+graph TB
+    subgraph "Internet"
+        Users[👤 Users]
+    end
+    
+    subgraph "Azure"
+        DNS[🌐 DNS Zone<br/>Your Domain]
+        Gateway[⚖️ Application Gateway<br/>Load Balancer + SSL]
+        
+        subgraph "Kubernetes Cluster"
+            LangFuse[📦 LangFuse<br/>Application]
+            CertManager[🔒 cert-manager<br/>SSL Certificates]
+        end
+        
+        Database[🗄️ PostgreSQL<br/>Database]
+        KeyVault[🔐 Key Vault<br/>Secrets & Certificates]
+        Email[📧 Communication Services<br/>Email Notifications]
+    end
+    
+    Users -->|HTTPS| Gateway
+    Gateway --> LangFuse
+    LangFuse --> Database
+    LangFuse --> Email
+    CertManager --> DNS
+    CertManager --> KeyVault
+    Gateway --> KeyVault
+```
+
+## Core Components
+
+### **Application Gateway**
+**What it does**: Acts as the front door to your LangFuse instance, handling HTTPS traffic and providing security features.
+
+**Why important**: Provides SSL encryption, protects against web attacks, and distributes traffic to your application.
+
+### **Azure Kubernetes Service (AKS)**
+**What it does**: Runs the LangFuse application in containers with automatic scaling and health monitoring.
+
+**Why important**: Ensures your application stays running, scales with demand, and handles updates without downtime.
+
+### **PostgreSQL Database**
+**What it does**: Stores all your LangFuse data including traces, user accounts, and analytics.
+
+**Why important**: Provides reliable data storage with automatic backups and high availability.
+
+### **DNS Zone**
+**What it does**: Manages your domain name and directs traffic to your LangFuse instance.
+
+**Why important**: Enables automatic SSL certificate validation and gives you control over your domain.
+
+### **Key Vault**
+**What it does**: Securely stores SSL certificates, database passwords, and other sensitive information.
+
+**Why important**: Keeps secrets secure and provides centralized management of sensitive configuration.
+
+### **Communication Services (Optional)**
+**What it does**: Enables LangFuse to send emails for user invitations and password resets.
+
+**Why important**: Required for user management features like inviting colleagues to your instance.
+
+## How Components Work Together
+
+1. **Users access** your LangFuse domain through their browser
+2. **DNS Zone** directs them to the Application Gateway
+3. **Application Gateway** handles SSL encryption and forwards requests to LangFuse
+4. **LangFuse application** processes requests and stores data in PostgreSQL
+5. **cert-manager** automatically manages SSL certificates using Let's Encrypt
+6. **Email notifications** are sent through Communication Services when needed
+
+## What Gets Created
+
+When you deploy LangFuse, Terraform automatically creates:
+
+- **1 Resource Group** containing all components
+- **1 Application Gateway** for load balancing and SSL
+- **1 AKS cluster** with 2-10 automatically scaling nodes
+- **1 PostgreSQL database** with high availability
+- **1 DNS zone** for your domain
+- **1 Key Vault** for secure storage
+- **1 Communication Services** resource (optional, for email)
+
+## Scaling and Performance
+
+The architecture automatically handles varying workloads:
+
+- **AKS nodes** scale up during high usage and down during quiet periods
+- **LangFuse pods** can be scaled independently based on demand
+- **PostgreSQL** provides consistent performance with automatic maintenance
+- **Application Gateway** distributes traffic efficiently across multiple instances
+
+## Security Features
+
+Security is built into every layer:
+
+- **HTTPS encryption** for all traffic
+- **Web Application Firewall** protects against common attacks
+- **Private networking** keeps internal components secure
+- **Automatic SSL certificates** ensure always-valid security
+- **Key Vault** manages all secrets securely
+
+## Next Steps
+
+Now that you understand the architecture:
+
+**Ready to Deploy?**
+
+1. **[Azure Deployment Guide](../how-to/azure-deployment.qmd)** - Step-by-step deployment
+2. **[SSL Configuration](../how-to/ssl-certificates.qmd)** - Set up trusted certificates  
+3. **[Email Notifications](../how-to/email-notifications.qmd)** - Configure SMTP
+
+**Want More Context?**
+
+- **[Self-Hosted LangFuse](self-hosting.qmd)** - Why self-host and alternatives
+- **[What is LangFuse?](overview.qmd)** - Core concepts and capabilities
+
+---
+
+*This architecture provides enterprise-grade reliability and security for your AI observability platform.* 
