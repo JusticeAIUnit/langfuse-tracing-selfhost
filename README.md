@@ -68,44 +68,18 @@ To run the website locally:
 ```
 ├── index.qmd              # Home page
 ├── explanation/           # Understanding-oriented content
-│   └── overview.qmd       # What is LangFuse?
 ├── tutorials/             # Learning-oriented content
-│   ├── quickstart.qmd     # Quick start guide
-│   └── basic.qmd          # Core instrumentation and basic patterns
 ├── how-to/                # Problem-oriented content
-│   ├── python-sdk.qmd    # LangFuse Python SDK
-│   ├── raw-requests.qmd  # Raw HTTP requests
-│   ├── opentelemetry.qmd # OpenTelemetry integration
-│   ├── azure.qmd          # Azure deployment guide
-│   ├── config.qmd         # Environment configuration
-│   └── troubleshooting.qmd # Common issues and solutions
 ├── _quarto.yml            # Site configuration
 ├── styles.css             # Custom styles
 └── .github/workflows/     # GitHub Actions for deployment
 ```
 
-### Key Features
-
-- **Theme Toggle**: Light/dark mode switching
-- **Code Folding**: Expandable code blocks
-- **Tabbed Content**: Multiple language examples
-- **Mermaid Diagrams**: Architecture diagrams
-- **Responsive Design**: Mobile-friendly layout
-
-## 🔧 Configuration
-
-The website is configured via `_quarto.yml` with:
-
-- **Navigation**: Organized using the [Diátaxis](https://diataxis.fr/) framework (Understanding → Learning → Problem Solving)
-- **Themes**: Flatly (light) and Darkly (dark) with toggle
-- **Features**: Search, code tools, table of contents
-- **Output**: GitHub Pages compatible
-
 ## 📝 Contributing
 
 1. **Edit content**: Modify `.qmd` files using Markdown syntax
 2. **Test locally**: Use `quarto preview` to see changes
-3. **Commit changes**: Push to main branch for automatic deployment
+3. **Commit changes**: Open a PR, merge to main will trigger deployment to GitHub Pages.
 
 ### Writing Guidelines
 
@@ -132,13 +106,6 @@ If you need to manually trigger deployment:
 1. Navigate to the [Actions tab](https://github.com/JusticeAIUnit/langfuse-tracing-selfhost/actions) in GitHub
 2. Select the "Deploy Quarto Website" workflow
 3. Click "Run workflow" on the main branch
-
-## 📞 Support
-
-For questions or contributions:
-- **GitHub Issues**: Report bugs or request features
-- **Justice AI Team**: Internal support and guidance
-- **LangFuse Community**: General questions about LangFuse
 
 ---
 
