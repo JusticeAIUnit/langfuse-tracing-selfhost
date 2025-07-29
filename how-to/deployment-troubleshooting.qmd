@@ -340,6 +340,113 @@ terraform apply -auto-approve 2>&1 | tee deployment.log
 # Collect Azure CLI debug info
 az resource list --resource-group <YOUR_RESOURCE_GROUP> --debug 2>&1 | tee azure-debug.log
 ```
+
+## Complex Multi-Component Failures
+
+### 502 Bad Gateway with Cascading Infrastructure Issues
+
+**Error Pattern**: Persistent 502 Bad Gateway errors with multiple component failures
+
+**Root Cause**: ZooKeeper memory exhaustion triggering cascading failures across ClickHouse, StatefulSets, and Application Gateway
+
+#### Diagnostic Steps
+
+```bash
+# Check overall pod health
+kubectl get pods -n langfuse
+
+# Check for OOMKilled containers
+kubectl describe pods -n langfuse | grep -A 5 -B 5 "OOMKilled"
+
+# Monitor memory usage
+kubectl top pods -n langfuse
+
+# Check ZooKeeper logs specifically
+kubectl logs -n langfuse statefulset/langfuse-zookeeper --tail=100
+```
+
+#### Resolution Sequence
+
+**Step 1: Address ZooKeeper Memory Issues**
+```bash
+# Check current ZooKeeper memory allocation
+kubectl get statefulset langfuse-zookeeper -n langfuse -o yaml | grep -A 5 resources
+
+# Increase memory via Helm upgrade (recommended approach)
+helm upgrade langfuse bitnami/langfuse -n langfuse \
+  --set zookeeper.resources.limits.memory=1Gi \
+  --set zookeeper.resources.requests.memory=512Mi
+```
+
+**Step 2: Restore StatefulSet Configuration**
+```bash
+# Avoid direct kubectl patches on StatefulSets - use Helm instead
+# Check for missing configuration
+kubectl get statefulset langfuse-zookeeper -n langfuse -o yaml | grep -E "(image|env|volumeMounts)"
+
+# If configuration is corrupted, restore via Helm
+helm upgrade langfuse bitnami/langfuse -n langfuse \
+  --set zookeeper.auth.enabled=false \
+  --set zookeeper.allowAnonymousLogin=true
+```
+
+**Step 3: Fix Application Gateway Backend Configuration**
+```bash
+# Check current backend pool configuration
+az network application-gateway address-pool show \
+  --gateway-name lng-appgw \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --name defaultaddresspool
+
+# Get current pod IP
+kubectl get pods -n langfuse -o wide | grep langfuse-web
+
+# Update backend pool with correct IP format (IP only, no port)
+az network application-gateway address-pool update \
+  --gateway-name lng-appgw \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --name defaultaddresspool \
+  --servers <POD_IP_ADDRESS>
+```
+
+**Verification Steps:**
+```bash
+# Verify all pods are running
+kubectl get pods -n langfuse
+
+# Check memory usage is healthy
+kubectl top pods -n langfuse
+
+# Test application response
+curl -I https://<YOUR_DOMAIN>
+
+# Monitor backend health
+az network application-gateway show-backend-health \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --name lng-appgw
+```
+
+#### Prevention Measures
+
+**Resource Sizing:**
+
+- Set ZooKeeper memory to 1Gi minimum for production workloads
+- Monitor memory usage patterns and set alerts at 80% utilization
+
+**Configuration Management:**
+
+- Use Helm upgrades instead of direct `kubectl patch` commands for StatefulSets
+- Maintain clean values files for environment-specific configurations
+
+**Monitoring Setup:**
+```bash
+# Set up resource monitoring
+kubectl top pods -n langfuse --watch
+
+# Monitor specific memory usage
+watch -n 10 'kubectl top pods -n langfuse | grep zookeeper'
+```
+
 ---
 
 *🔧 Most deployment issues are temporary and resolve with patience and systematic troubleshooting.* 
