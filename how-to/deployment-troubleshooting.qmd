@@ -161,6 +161,214 @@ terraform apply -auto-approve
 
 **Error**: 502 Bad Gateway errors
 
+**Root Cause**: Multiple possible causes require systematic diagnosis to identify the specific issue.
+
+**Diagnostic Approach**: Use the branching strategy below to identify your specific 502 error type.
+
+## 502 Bad Gateway Error Types - Summary
+
+Based on real deployment experience, we've identified **5 distinct types** of 502 Bad Gateway errors:
+
+| Type | Symptoms | Root Cause | Resolution Time |
+|------|----------|------------|-----------------|
+| **A: Pod Startup Failure** | Pods not running (Pending, CrashLoopBackOff) | Resource constraints, config errors | 10-30 minutes |
+| **B: Backend IP Mismatch** | Backend "Unhealthy", pods running | Pods restarted, gateway not updated | 5 minutes |
+| **C: AGIC Configuration Issue** | Backend "Healthy" but still 502 | AGIC config conflicts | 15 minutes |
+| **D: AGIC Permission Issue** | AGIC logs show "authorizationfailed" | Missing permissions | 10 minutes |
+| **E: Complex Multi-Component** | Multiple failures, memory issues | ZooKeeper memory exhaustion | 30-60 minutes |
+
+### 502 Error Diagnostic Tree
+
+**Step 1: Check Pod Status**
+```bash
+kubectl get pods -n langfuse
+```
+
+**If pods are not running (Pending, CrashLoopBackOff, etc.):**
+- → **Type A: Pod Startup Failure** (see below)
+
+**If pods are running, continue to Step 2:**
+
+**Step 2: Check Application Gateway Backend Health**
+```bash
+az network application-gateway show-backend-health --resource-group <YOUR_RESOURCE_GROUP> --name <YOUR_APP_GATEWAY>
+```
+
+**If backend shows "Unhealthy":**
+- → **Type B: Backend IP Mismatch** (see below)
+
+**If backend shows "Healthy" but still getting 502:**
+- → **Type C: AGIC Configuration Issue** (see below)
+
+**Step 3: Check AGIC Logs**
+```bash
+kubectl logs -n kube-system deployment/ingress-appgw-deployment | grep -i "authorizationfailed" | tail -5
+```
+
+**If permission errors found:**
+- → **Type D: AGIC Permission Issue** (see below)
+
+### Type A: Pod Startup Failure
+
+**Symptoms**: Pods in Pending, CrashLoopBackOff, or other non-Running states
+
+**Root Cause**: Resource constraints, configuration errors, or infrastructure issues
+
+**Resolution**:
+```bash
+# Check pod events for specific errors
+kubectl describe pods -n langfuse
+
+# Check resource usage
+kubectl top pods -n langfuse
+
+# Check node resources
+kubectl describe nodes
+
+# If resource constraints, scale AKS node pool
+# Update node_pool_max_count in main.tf and reapply
+```
+
+### Type B: Backend IP Mismatch
+
+**Symptoms**: Backend shows "Unhealthy", pods are running but gateway points to wrong IP
+
+**Root Cause**: LangFuse pods restarted and got new IP addresses, but Application Gateway wasn't updated
+
+**Quick Fix (5 minutes):**
+```bash
+# 1. Get current pod IP
+POD_IP=$(kubectl get pods -n langfuse -o wide | grep langfuse-web | awk '{print $6}')
+
+# 2. Update Application Gateway backend pool
+az network application-gateway address-pool update \
+  --gateway-name <YOUR_APP_GATEWAY> \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --name pool-langfuse-langfuse-web-http-bp-3000 \
+  --servers $POD_IP
+
+# 3. Test the website
+curl -k -I https://<YOUR_DOMAIN>
+```
+
+**Permanent Fix (One-time setup):**
+```bash
+# Grant AGIC permission to auto-update backend IPs
+RESOURCE_GROUP="<YOUR_RESOURCE_GROUP>"
+AGIC_CLIENT_ID=$(kubectl get configmap ingress-appgw-cm -n kube-system -o jsonpath='{.data.AZURE_CLIENT_ID}')
+AGIC_OBJECT_ID=$(az ad sp show --id $AGIC_CLIENT_ID --query id -o tsv)
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+az role assignment create \
+  --assignee $AGIC_OBJECT_ID \
+  --role "Contributor" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP"
+
+kubectl rollout restart deployment ingress-appgw-deployment -n kube-system
+sleep 45
+```
+
+### Type C: AGIC Configuration Issue
+
+**Symptoms**: Backend shows "Healthy" but still getting 502, AGIC logs show configuration errors
+
+**Root Cause**: AGIC configuration conflicts or corrupted state
+
+**Resolution**:
+```bash
+# 1. Refresh Terraform state
+terraform refresh
+
+# 2. Reapply configuration
+terraform apply -auto-approve
+
+# 3. Restart AGIC to pick up changes
+kubectl rollout restart deployment ingress-appgw-deployment -n kube-system
+
+# 4. Wait for restart and verify
+sleep 45
+kubectl logs -n kube-system deployment/ingress-appgw-deployment --tail=10
+```
+
+### Type D: AGIC Permission Issue
+
+**Symptoms**: AGIC logs show "authorizationfailed" or permission errors
+
+**Root Cause**: AGIC managed identity lacks required permissions
+
+**Resolution**:
+```bash
+# 1. Get AGIC managed identity details
+AGIC_CLIENT_ID=$(kubectl get configmap ingress-appgw-cm -n kube-system -o jsonpath='{.data.AZURE_CLIENT_ID}')
+AGIC_OBJECT_ID=$(az ad sp show --id $AGIC_CLIENT_ID --query id -o tsv)
+
+# 2. Grant Contributor permissions
+az role assignment create \
+  --assignee $AGIC_OBJECT_ID \
+  --role "Contributor" \
+  --scope "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/<YOUR_RESOURCE_GROUP>"
+
+# 3. Restart AGIC
+kubectl rollout restart deployment ingress-appgw-deployment -n kube-system
+sleep 45
+```
+
+### Type E: ZooKeeper Memory Exhaustion
+
+**Symptoms**: Multiple components failing, memory issues, cascading failures, persistent 502 errors
+
+**Root Cause**: ZooKeeper memory exhaustion triggering cascading failures across ClickHouse, StatefulSets, and Application Gateway
+
+**Diagnostic Steps**:
+```bash
+# Check for OOMKilled containers
+kubectl describe pods -n langfuse | grep -A 5 -B 5 "OOMKilled"
+
+# Monitor memory usage
+kubectl top pods -n langfuse
+
+# Check ZooKeeper logs specifically
+kubectl logs -n langfuse statefulset/langfuse-zookeeper --tail=100
+```
+
+**Resolution**:
+```bash
+# 1. Check current ZooKeeper memory allocation
+kubectl get statefulset langfuse-zookeeper -n langfuse -o yaml | grep -A 5 resources
+
+# 2. Increase ZooKeeper memory via Helm upgrade
+helm upgrade langfuse bitnami/langfuse -n langfuse \
+  --set zookeeper.resources.limits.memory=1Gi \
+  --set zookeeper.resources.requests.memory=512Mi
+
+# 3. Restore StatefulSet configuration if corrupted
+helm upgrade langfuse bitnami/langfuse -n langfuse \
+  --set zookeeper.auth.enabled=false \
+  --set zookeeper.allowAnonymousLogin=true
+
+# 4. Fix Application Gateway backend configuration
+POD_IP=$(kubectl get pods -n langfuse -o wide | grep langfuse-web | awk '{print $6}')
+az network application-gateway address-pool update \
+  --gateway-name <YOUR_APP_GATEWAY> \
+  --resource-group <YOUR_RESOURCE_GROUP> \
+  --name pool-langfuse-langfuse-web-http-bp-3000 \
+  --servers $POD_IP
+
+# 5. Verify resolution
+kubectl get pods -n langfuse
+kubectl top pods -n langfuse
+curl -I https://<YOUR_DOMAIN>
+```
+
+**Prevention**:
+```bash
+# Set up resource monitoring
+kubectl top pods -n langfuse --watch
+
+# Monitor specific memory usage
+watch -n 10 'kubectl top pods -n langfuse | grep zookeeper'
+```
+
 **Diagnostic Steps:**
 ```bash
 # Check AKS pods
@@ -170,12 +378,15 @@ kubectl get pods -n langfuse
 kubectl get ingress -n langfuse -o yaml
 
 # Check Application Gateway backend health
-az network application-gateway show-backend-health --resource-group <YOUR_RESOURCE_GROUP> --name lng-appgw
+az network application-gateway show-backend-health --resource-group <YOUR_RESOURCE_GROUP> --name <YOUR_APP_GATEWAY>
+
+# Check for permission errors in the gateway controller
+kubectl logs -n kube-system deployment/ingress-appgw-deployment | grep -i "authorizationfailed" | tail -5
 ```
 
-### DNS and SSL Issues
+## DNS and SSL Issues
 
-#### DNS Propagation Delays
+### DNS Propagation Delays
 
 **Problem**: Domain not resolving after deployment
 
@@ -190,9 +401,34 @@ nslookup <YOUR_DOMAIN>
 # Wait 5-30 minutes for global propagation
 ```
 
-#### SSL Certificate Issues
+### SSL Certificate Issues
 
 **Problem**: Browser shows "Not Secure" or certificate warnings
+
+**Root Cause**: After restarting the gateway controller, it forgets to use the Let's Encrypt certificate and falls back to the self-signed one stored in Azure Key Vaultthat browsers don't trust.
+
+**Quick Fix (5 minutes):**
+```bash
+# 1. Remove the old certificate configuration
+kubectl patch ingress langfuse -n langfuse --type='json' -p='[{"op": "remove", "path": "/metadata/annotations/appgw.ingress.kubernetes.io~1appgw-ssl-certificate"}]'
+
+# 2. Tell it to use the proper Let's Encrypt certificate
+kubectl patch ingress langfuse -n langfuse --type='json' -p='[{"op": "add", "path": "/spec/tls", "value": [{"hosts": ["<YOUR_DOMAIN>"], "secretName": "langfuse-tls-secret"}]}]'
+
+# 3. Wait for the change to take effect (60 seconds)
+sleep 60
+
+# 4. Test the website
+curl -I https://<YOUR_DOMAIN>
+```
+
+**Permanent Fix (One-time setup):**
+```bash
+# Check if the certificate is properly configured
+kubectl get certificate langfuse-tls -n langfuse
+
+```
+If it shows "Ready: True", the certificate is working. If not, you may need to reapply the SSL configuration. See the [SSL Certificates Guide](../how-to/ssl-certificates.qmd)
 
 **Diagnostic Steps:**
 ```bash
@@ -204,11 +440,14 @@ kubectl get ingress langfuse -n langfuse -o yaml | grep -A 5 tls
 
 # Test SSL certificate
 openssl s_client -connect <YOUR_DOMAIN>:443 -servername <YOUR_DOMAIN>
+
+# Check SSL certificate issuer
+openssl s_client -connect <YOUR_DOMAIN>:443 -servername <YOUR_DOMAIN> </dev/null 2>/dev/null | openssl x509 -noout -text | grep -A 1 "Issuer:"
 ```
 
-### AKS and Kubernetes Issues
+## AKS and Kubernetes Issues
 
-#### Pod Startup Failures
+### Pod Startup Failures
 
 **Problem**: LangFuse pods not starting
 
@@ -224,7 +463,7 @@ kubectl logs -n langfuse deployment/langfuse-web --tail=50
 kubectl get events -n langfuse --sort-by='.lastTimestamp'
 ```
 
-#### Resource Constraints
+### Resource Constraints
 
 **Problem**: Pods pending or resource-related errors
 
@@ -303,6 +542,68 @@ terraform apply -auto-approve
 | `MethodNotAllowed.*Purge` | Purge protection enabled | Use different name or disable protection |
 | `ConflictError.*already in use` | Soft-deleted resource | Purge or use different name |
 | `InvalidResourceReference.*redirectConfigurations` | AGIC configuration conflict | Run `terraform refresh`, then apply |
+| **502 Bad Gateway** | Multiple possible causes | Use diagnostic tree to identify specific type (see 502 Error Types Summary) |
+| **"Your connection is not private"** | Wrong SSL certificate being used | Switch to Let's Encrypt certificate (see SSL Certificate Issues) |
+| **Gateway shows "Unhealthy"** | Server IP mismatch or server not responding | Type B: Backend IP Mismatch (see above) |
+| **Permission errors in logs** | Gateway controller can't update settings | Type D: AGIC Permission Issue (see above) |
+
+## Comprehensive Troubleshooting Reference
+
+### Quick Diagnosis Commands
+
+**When something goes wrong, check these in order:**
+
+```bash
+# 1. Are all the LangFuse services running?
+kubectl get pods -n langfuse
+
+# 2. Is the gateway pointing to the right server?
+az network application-gateway show-backend-health --resource-group <YOUR_RESOURCE_GROUP> --name <YOUR_APP_GATEWAY>
+
+# 3. Are there any permission errors in the gateway controller?
+kubectl logs -n kube-system deployment/ingress-appgw-deployment | grep -i "authorizationfailed" | tail -5
+
+# 4. Is the SSL certificate working?
+openssl s_client -connect <YOUR_DOMAIN>:443 -servername <YOUR_DOMAIN> </dev/null 2>/dev/null | openssl x509 -noout -text | grep -A 1 "Issuer:"
+```
+
+### Discovery Commands
+
+**Need to find the correct values for your deployment?**
+
+```bash
+# Find your resource groups
+az group list --query "[?contains(name, 'langfuse') || contains(name, 'lng')].name" -o tsv
+
+# Find your Application Gateway
+az network application-gateway list --resource-group <YOUR_RESOURCE_GROUP> --query "[].{Name:name, ProvisioningState:provisioningState}" -o table
+
+# Find your AKS cluster
+az aks list --resource-group <YOUR_RESOURCE_GROUP> --query "[].{Name:name, ResourceGroup:resourceGroup}" -o table
+
+# Get AGIC managed identity details
+kubectl get configmap ingress-appgw-cm -n kube-system -o yaml | grep AZURE_CLIENT_ID
+
+# Get AGIC managed identity object ID
+AGIC_CLIENT_ID=$(kubectl get configmap ingress-appgw-cm -n kube-system -o jsonpath='{.data.AZURE_CLIENT_ID}')
+az ad sp show --id $AGIC_CLIENT_ID --query "{DisplayName:displayName, ObjectId:id, ClientId:appId}" -o table
+
+# Check current role assignments for AGIC
+AGIC_OBJECT_ID=$(az ad sp show --id $AGIC_CLIENT_ID --query id -o tsv)
+az role assignment list --assignee $AGIC_OBJECT_ID --resource-group <YOUR_RESOURCE_GROUP>
+```
+
+### Health Check Commands
+
+**One command to check if everything is working:**
+
+```bash
+# This will show you the status of all components
+echo "=== Pod Status ===" && kubectl get pods -n langfuse && \
+echo "=== Gateway Health ===" && az network application-gateway show-backend-health --resource-group <YOUR_RESOURCE_GROUP> --name <YOUR_APP_GATEWAY> | jq '.backendAddressPools[0].backendHttpSettingsCollection[0].servers[0].health' && \
+echo "=== Website Response ===" && curl -k -s -o /dev/null -w "%{http_code}" https://<YOUR_DOMAIN>
+```
+
 
 ## Best Practices for Troubleshooting
 
@@ -343,109 +644,7 @@ az resource list --resource-group <YOUR_RESOURCE_GROUP> --debug 2>&1 | tee azure
 
 ## Complex Multi-Component Failures
 
-### 502 Bad Gateway with Cascading Infrastructure Issues
-
-**Error Pattern**: Persistent 502 Bad Gateway errors with multiple component failures
-
-**Root Cause**: ZooKeeper memory exhaustion triggering cascading failures across ClickHouse, StatefulSets, and Application Gateway
-
-#### Diagnostic Steps
-
-```bash
-# Check overall pod health
-kubectl get pods -n langfuse
-
-# Check for OOMKilled containers
-kubectl describe pods -n langfuse | grep -A 5 -B 5 "OOMKilled"
-
-# Monitor memory usage
-kubectl top pods -n langfuse
-
-# Check ZooKeeper logs specifically
-kubectl logs -n langfuse statefulset/langfuse-zookeeper --tail=100
-```
-
-#### Resolution Sequence
-
-**Step 1: Address ZooKeeper Memory Issues**
-```bash
-# Check current ZooKeeper memory allocation
-kubectl get statefulset langfuse-zookeeper -n langfuse -o yaml | grep -A 5 resources
-
-# Increase memory via Helm upgrade (recommended approach)
-helm upgrade langfuse bitnami/langfuse -n langfuse \
-  --set zookeeper.resources.limits.memory=1Gi \
-  --set zookeeper.resources.requests.memory=512Mi
-```
-
-**Step 2: Restore StatefulSet Configuration**
-```bash
-# Avoid direct kubectl patches on StatefulSets - use Helm instead
-# Check for missing configuration
-kubectl get statefulset langfuse-zookeeper -n langfuse -o yaml | grep -E "(image|env|volumeMounts)"
-
-# If configuration is corrupted, restore via Helm
-helm upgrade langfuse bitnami/langfuse -n langfuse \
-  --set zookeeper.auth.enabled=false \
-  --set zookeeper.allowAnonymousLogin=true
-```
-
-**Step 3: Fix Application Gateway Backend Configuration**
-```bash
-# Check current backend pool configuration
-az network application-gateway address-pool show \
-  --gateway-name lng-appgw \
-  --resource-group <YOUR_RESOURCE_GROUP> \
-  --name defaultaddresspool
-
-# Get current pod IP
-kubectl get pods -n langfuse -o wide | grep langfuse-web
-
-# Update backend pool with correct IP format (IP only, no port)
-az network application-gateway address-pool update \
-  --gateway-name lng-appgw \
-  --resource-group <YOUR_RESOURCE_GROUP> \
-  --name defaultaddresspool \
-  --servers <POD_IP_ADDRESS>
-```
-
-**Verification Steps:**
-```bash
-# Verify all pods are running
-kubectl get pods -n langfuse
-
-# Check memory usage is healthy
-kubectl top pods -n langfuse
-
-# Test application response
-curl -I https://<YOUR_DOMAIN>
-
-# Monitor backend health
-az network application-gateway show-backend-health \
-  --resource-group <YOUR_RESOURCE_GROUP> \
-  --name lng-appgw
-```
-
-#### Prevention Measures
-
-**Resource Sizing:**
-
-- Set ZooKeeper memory to 1Gi minimum for production workloads
-- Monitor memory usage patterns and set alerts at 80% utilization
-
-**Configuration Management:**
-
-- Use Helm upgrades instead of direct `kubectl patch` commands for StatefulSets
-- Maintain clean values files for environment-specific configurations
-
-**Monitoring Setup:**
-```bash
-# Set up resource monitoring
-kubectl top pods -n langfuse --watch
-
-# Monitor specific memory usage
-watch -n 10 'kubectl top pods -n langfuse | grep zookeeper'
-```
+*Note: For ZooKeeper memory exhaustion issues that present as 502 Bad Gateway errors, see **Type E: ZooKeeper Memory Exhaustion** in the Application Gateway Issues section above.*
 
 ---
 
