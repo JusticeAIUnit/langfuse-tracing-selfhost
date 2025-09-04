@@ -289,6 +289,47 @@ curl -I http://<YOUR_DOMAIN_URL>
 **SSL Required**: The deployment creates self-signed certificates by default. You'll need to configure proper SSL certificates before production use. See the [SSL Configuration Guide](ssl-certificates.qmd) for next steps.
 :::
 
+## Post-Deployment Configuration
+
+### SSO (Single Sign-On) Configuration
+
+**Configure Azure AD SSO** for your LangFuse deployment to enforce organizational authentication policies:
+
+```bash
+# Configure SSO environment variables
+kubectl set env deployment/langfuse-web -n langfuse \
+  SSO_DOMAIN_ENFORCEMENT=justice.gov.uk \
+  DISABLE_USERNAME_PASSWORD=true
+```
+
+**Configuration Options:**
+
+| Variable | Purpose | Default | Recommended |
+|----------|---------|---------|-------------|
+| `SSO_DOMAIN_ENFORCEMENT` | Restricts user registration to specific domain | `justice.gov.uk` | Set to your organization's domain |
+| `DISABLE_USERNAME_PASSWORD` | Disables password-based authentication | `true` | `true` for production environments |
+
+**Important Notes:**
+
+- **Domain Enforcement**: Only users with email addresses from the specified domain can register or be invited
+- **Password Disable**: When `true`, users can only authenticate via Azure AD SSO, not username/password
+- **Existing Users**: Users with existing password-based accounts may need migration (see [User Management Guide](user-management.qmd))
+
+**Verify SSO Configuration:**
+
+```bash
+# Check environment variables are set
+kubectl exec -n langfuse deployment/langfuse-web -- printenv | grep -E "(SSO_DOMAIN|DISABLE_USERNAME)"
+
+# Restart deployment to ensure changes take effect
+kubectl rollout restart deployment/langfuse-web -n langfuse
+kubectl rollout status deployment/langfuse-web -n langfuse --timeout=120s
+```
+
+::: {.callout-tip}
+**SSO Migration**: If you have existing password-based users, see the [User Management Guide](user-management.qmd) for migration procedures to avoid authentication conflicts.
+:::
+
 ## Next Steps
 
 Your LangFuse infrastructure is now deployed! To make it production-ready:
