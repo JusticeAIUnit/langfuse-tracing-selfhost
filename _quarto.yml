@@ -42,6 +42,8 @@ website:
             file: how-to/ssl-certificates.qmd
           - text: "Email Notifications"
             file: how-to/email-notifications.qmd
+          - text: "User Management"
+            file: how-to/user-management.qmd
           - text: "Deployment Troubleshooting"
             file: how-to/deployment-troubleshooting.qmd
     right:

@@ -1,0 +1,268 @@
+---
+title: "User Management and SSO Migration"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "how-to"
+  purpose: "Problem-oriented - Manage users and resolve SSO migration issues"
+categories: ["User Management", "Authentication", "Troubleshooting"]
+---
+
+::: {.callout-note icon="false"}
+**🛠️ How-to Guide** - This guide helps you manage LangFuse users and resolve issues when migrating from password-based authentication to Azure AD SSO.
+:::
+
+# User Management and SSO Migration
+
+**Problem**: You're encountering authentication errors when migrating existing users from password-based authentication to Azure AD SSO, or need to manage user accounts in the database.
+
+**Solution**: This guide provides specific database operations to resolve SSO migration issues and manage user accounts effectively.
+
+::: {.callout-warning}
+**Database Operations**: The procedures in this guide involve direct database manipulation. Always backup your database before making changes.
+:::
+
+## SSO Migration Issues
+
+### The "Same Provider" Error
+
+**Problem Symptom**: When migrating existing password-based users to SSO, users encounter the error:
+
+> *"Please sign in with the same provider (e.g. Google, GitHub, Azure AD, etc.) that you used to create this account."*
+
+**Root Cause**: Certain database records link the user's email to an existing password-based account, preventing fresh SSO account creation.
+
+## Database Schema: Tables That Block SSO Onboarding
+
+```{mermaid}
+erDiagram
+    users ||--o{ Account : "links to OAuth"
+    users ||--o{ Session : "has sessions"
+    users }o--|| membership_invitations : "email match"
+    
+    users {
+        text id PK "Primary blocker"
+        text email UK "Email match key"
+        text password "Non-null blocks SSO"
+        boolean admin
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    Account {
+        text user_id FK "Auto-cleaned"
+        text provider "Azure AD"
+        text provider_account_id
+    }
+    
+    Session {
+        text user_id FK "Auto-cleaned"
+        text session_token
+        timestamp expires
+    }
+    
+    membership_invitations {
+        text email "Potential conflict"
+        text organization_id FK
+        text role
+        timestamp expires_at
+    }
+```
+
+## Tables That Block Fresh SSO Onboarding
+
+### `users` Table - **PRIMARY BLOCKER** ⚠️
+
+**Why it blocks**: If a user record exists with a non-null `password` field, LangFuse attempts to link the Azure AD login to the existing password-based account, causing the "same provider" error.
+
+#### Key Schema Elements
+
+| Column | Type | Nullable | Impact on SSO |
+|--------|------|----------|---------------|
+| `id` | text | NO | Primary key that must be removed |
+| `email` | text | YES | Unique constraint - email match triggers conflict |
+| `password` | text | YES | **Non-null value blocks fresh SSO setup** |
+| `admin` | boolean | NO | User privileges (lost on deletion) |
+
+**Solution**: Complete user deletion
+
+### User Deletion Procedure
+
+**Step 1: Get Database Connection Details**
+
+```bash
+# Get database password
+kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d
+```
+
+**Step 2: Delete User Record**
+
+```bash
+# Replace 'user@example.com' with the actual email address
+kubectl run delete-user --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+apt-get update -qq && apt-get install -y postgresql-client -qq
+echo 'Deleting user record...'
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"DELETE FROM users WHERE email = 'user@example.com';\"
+echo 'User deletion completed!'
+"
+```
+
+::: {.callout-important}
+**Database Host IP**: The IP address `10.224.0.65` in the example above should be replaced with your actual PostgreSQL service IP. You can find this with:
+```bash
+kubectl get service langfuse-postgresql -n langfuse -o jsonpath='{.spec.clusterIP}'
+```
+:::
+
+### `membership_invitations` Table - **POTENTIAL CONFLICT** 📧
+
+**Why it might block**: Existing pending invitations for the same email could interfere with the new invitation flow.
+
+#### Key Schema Elements
+
+| Column | Type | Impact |
+|--------|------|--------|
+| `email` | text | Email match with user being migrated |
+| `expires_at` | timestamp | Old invitations may still be active |
+
+**Solution (Optional)**: Clean up old invitations
+
+```bash
+# Replace 'user@example.com' with the actual email address
+kubectl run cleanup-invitations --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+apt-get update -qq && apt-get install -y postgresql-client -qq
+echo 'Cleaning up old invitations...'
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"DELETE FROM membership_invitations WHERE email = 'user@example.com';\"
+echo 'Invitation cleanup completed!'
+"
+```
+
+## Complete SSO Migration Procedure
+
+### Step-by-Step Migration Process
+
+**Step 1: Identify Users to Migrate**
+
+```bash
+# List all password-based users
+kubectl run list-users --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+apt-get update -qq && apt-get install -y postgresql-client -qq
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"SELECT email, admin, created_at FROM users WHERE password IS NOT NULL;\"
+"
+```
+
+**Step 2: Clean Up User Records**
+
+For each user to be migrated:
+
+1. Delete the user record (see procedure above)
+2. Optionally clean up membership invitations
+3. Verify deletion was successful
+
+**Step 3: Fresh SSO Setup**
+
+After user deletion:
+
+1. Admin creates new invitation for the user via LangFuse UI
+2. User clicks invitation link and signs in with Azure AD
+3. Fresh SSO account is created automatically
+
+**Step 4: Verification**
+
+```bash
+# Verify user now has SSO account
+kubectl run verify-sso --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+apt-get update -qq && apt-get install -y postgresql-client -qq
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"
+SELECT u.email, u.password IS NULL as sso_ready, a.provider 
+FROM users u 
+LEFT JOIN Account a ON u.id = a.user_id 
+WHERE u.email = 'user@example.com';\"
+"
+```
+
+## Common User Management Tasks
+
+### Check User Account Status
+
+```bash
+# Check if user exists and authentication method
+kubectl run check-user --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+apt-get update -qq && apt-get install -y postgresql-client -qq
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"
+SELECT 
+  u.email,
+  CASE WHEN u.password IS NOT NULL THEN 'Password' ELSE 'SSO' END as auth_method,
+  u.admin,
+  a.provider as sso_provider,
+  u.created_at
+FROM users u 
+LEFT JOIN Account a ON u.id = a.user_id 
+WHERE u.email = 'user@example.com';\"
+"
+```
+
+### List All Active Sessions
+
+```bash
+# View active user sessions
+kubectl run list-sessions --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+apt-get update -qq && apt-get install -y postgresql-client -qq
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"
+SELECT u.email, s.expires, s.session_token 
+FROM Session s 
+JOIN users u ON s.user_id = u.id 
+WHERE s.expires > NOW() 
+ORDER BY s.expires DESC;\"
+"
+```
+
+### Clean Up Expired Sessions
+
+```bash
+# Remove expired sessions
+kubectl run cleanup-sessions --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+apt-get update -qq && apt-get install -y postgresql-client -qq
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"DELETE FROM Session WHERE expires < NOW();\"
+"
+```
+
+## Troubleshooting User Issues
+
+### User Cannot Access After SSO Migration
+
+**Problem**: User completed SSO migration but cannot access their previous data
+
+**Root Cause**: User was recreated with a new ID, breaking data relationships
+
+**Solution**: This is expected behavior. SSO migration creates a fresh account. Previous data is not automatically transferred.
+
+### Multiple Accounts for Same User
+
+**Problem**: User has both password and SSO accounts
+
+**Root Cause**: User deletion was not completed before SSO setup
+
+**Solution**: 
+1. Identify which account has the correct data
+2. Delete the unwanted account using the procedures above
+3. Ensure only one account exists per email
+
+### Admin Privileges Lost After Migration
+
+**Problem**: User lost admin privileges after SSO migration
+
+**Root Cause**: Admin status is stored in the `users` table and is lost during deletion
+
+**Solution**: Restore admin privileges via database
+
+```bash
+# Grant admin privileges to SSO user
+kubectl run grant-admin --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+apt-get update -qq && apt-get install -y postgresql-client -qq
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"UPDATE users SET admin = true WHERE email = 'user@example.com';\"
+"
+```
+
+**Key Takeaway**: The `users` table with a non-null `password` field is the primary blocker for fresh SSO onboarding. Complete user deletion resolves the issue and allows fresh Azure AD account creation, but requires careful handling of admin privileges and user communication.

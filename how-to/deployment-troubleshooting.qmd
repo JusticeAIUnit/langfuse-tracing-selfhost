@@ -680,6 +680,7 @@ terraform apply -auto-approve
 | **Permission errors in logs** | Gateway controller can't update settings | Type D: AGIC Permission Issue (see above) |
 | **535 5.7.3 Authentication unsuccessful** | SMTP client secret mismatch | Update SMTP_CONNECTION_URL with correct client secret (see SMTP Email Delivery Issues) |
 | **Emails not delivered but no UI errors** | SMTP authentication failing silently | Check LangFuse logs for SMTP errors (see SMTP Email Delivery Issues) |
+| **"Same provider" SSO error** | Existing password-based user blocks SSO | Delete user record to allow fresh SSO setup (see [User Management Guide](user-management.qmd)) |
 
 ## Comprehensive Troubleshooting Reference
 
