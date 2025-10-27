@@ -175,7 +175,7 @@ Based on real deployment experience, we've identified **5 distinct types** of 50
 | **B: Backend IP Mismatch** | Backend "Unhealthy", pods running | Pods restarted, gateway not updated | 5 minutes |
 | **C: AGIC Configuration Issue** | Backend "Healthy" but still 502 | AGIC config conflicts | 15 minutes |
 | **D: AGIC Permission Issue** | AGIC logs show "authorizationfailed" | Missing permissions | 10 minutes |
-| **E: Complex Multi-Component** | Multiple failures, memory issues | ZooKeeper memory exhaustion | 30-60 minutes |
+| **E: ZooKeeper Memory Exhaustion** | UI shows null traces, AKS OOM logs | ZooKeeper memory exhaustion | 30-60 minutes |
 
 ### 502 Error Diagnostic Tree
 
@@ -319,7 +319,37 @@ sleep 45
 
 **Root Cause**: ZooKeeper memory exhaustion triggering cascading failures across ClickHouse, StatefulSets, and Application Gateway
 
+#### Visual Indicators of ZooKeeper OOM Issues
+
+##### LangFuse UI Symptoms
+
+When ZooKeeper memory exhaustion occurs, the LangFuse UI may show degraded functionality:
+
+![ZooKeeper OOM in LangFuse UI](../images/troubleshooting/langfuse-zookeeper-oom-ui.png)
+
+**Key UI Indicators:**
+
+- **Trace Loading Issues**: Traces may show "Not Found" errors or fail to load completely
+- **Null Input/Output**: Trace data appears as `null` values instead of actual content
+- **Empty Metadata**: Trace metadata sections show empty JSON objects `{}`
+- **Timeline Disruption**: Trace timeline may be incomplete or missing spans
+
+##### AKS Monitor Symptoms
+
+**Critical Error Pattern in AKS Logs:**
+
+```
+Memory cgroup out of memory: Killed process ...
+```
+
+**Key Log Indicators:**
+
+- **"Memory cgroup out of memory"** - Primary OOM signal
+- **"Killed process"** - Process termination due to memory limits
+- **High oom_score_adj values** - Indicates container memory pressure
+
 **Diagnostic Steps**:
+
 ```bash
 # Check for OOMKilled containers
 kubectl describe pods -n langfuse | grep -A 5 -B 5 "OOMKilled"
@@ -329,9 +359,16 @@ kubectl top pods -n langfuse
 
 # Check ZooKeeper logs specifically
 kubectl logs -n langfuse statefulset/langfuse-zookeeper --tail=100
+
+# Search AKS logs for OOM events
+kubectl get events -n langfuse --field-selector reason=OOMKilling
+
+# Check container memory limits vs usage
+kubectl describe pod -n langfuse -l app.kubernetes.io/name=zookeeper
 ```
 
 **Resolution**:
+
 ```bash
 # 1. Check current ZooKeeper memory allocation
 kubectl get statefulset langfuse-zookeeper -n langfuse -o yaml | grep -A 5 resources
