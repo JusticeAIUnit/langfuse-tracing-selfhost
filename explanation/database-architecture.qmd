@@ -1,0 +1,296 @@
+---
+title: "LangFuse Database Architecture"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "explanation"
+  purpose: "Understanding-oriented - explains LangFuse's dual database architecture and component relationships"
+categories: ["Concepts", "Infrastructure & Deployment", "Database"]
+---
+
+::: {.callout-note icon="false"}
+**📚 Explanation** - This page explains LangFuse's sophisticated database architecture, including why it uses multiple database systems and how they work together to provide high-performance observability.
+:::
+
+# Understanding LangFuse Database Architecture
+
+LangFuse uses a sophisticated dual-database architecture designed to handle both operational data and high-volume analytics workloads efficiently. Understanding this architecture is crucial for effective deployment, troubleshooting, and performance optimization.
+
+## Dual Database Architecture Overview
+
+LangFuse separates concerns by using **two distinct database systems**, each optimized for different types of workloads:
+
+```{mermaid}
+graph TB
+    subgraph "LangFuse Application Layer"
+        WebUI[🌐 Web UI]
+        API[🔌 API Server]
+        SDK[📦 Python SDK]
+    end
+    
+    subgraph "Database Layer"
+        subgraph "PostgreSQL Cluster"
+            PG[(🗄️ PostgreSQL<br/>User Management)]
+            PGData[👥 Users<br/>🏢 Organizations<br/>📋 Projects<br/>🔑 API Keys<br/>⚙️ Settings]
+        end
+        
+        subgraph "ClickHouse Cluster"
+            CH1[(📊 ClickHouse<br/>Replica 1)]
+            CH2[(📊 ClickHouse<br/>Replica 2)]
+            CH3[(📊 ClickHouse<br/>Replica 3)]
+            
+            ZK[🐘 ZooKeeper<br/>Coordination Plane]
+            
+            CHData[📈 Traces<br/>🔍 Observations<br/>⭐ Scores<br/>📊 Analytics]
+        end
+    end
+    
+    WebUI --> API
+    SDK --> API
+    API --> PG
+    API --> CH1
+    API --> CH2
+    API --> CH3
+    
+    CH1 -.->|Coordinates| ZK
+    CH2 -.->|Coordinates| ZK
+    CH3 -.->|Coordinates| ZK
+    
+    PG --> PGData
+    CH1 --> CHData
+    CH2 --> CHData
+    CH3 --> CHData
+    
+    classDef postgres fill:#336791,stroke:#fff,stroke-width:2px,color:#fff
+    classDef clickhouse fill:#FFCC02,stroke:#000,stroke-width:2px,color:#000
+    classDef zookeeper fill:#4CAF50,stroke:#fff,stroke-width:2px,color:#fff
+    classDef app fill:#2196F3,stroke:#fff,stroke-width:2px,color:#fff
+    classDef data fill:#f9f9f9,stroke:#666,stroke-width:1px
+    
+    class PG postgres
+    class CH1,CH2,CH3 clickhouse
+    class ZK zookeeper
+    class WebUI,API,SDK app
+    class PGData,CHData data
+```
+
+## Database System Roles
+
+### PostgreSQL: Operational Data Store
+
+**Purpose**: Handles all operational and user management data that requires ACID transactions and relational integrity.
+
+**Data Types Stored**:
+
+- **User Accounts** - Authentication, profiles, permissions
+- **Organizations** - Multi-tenant organization structures
+- **Projects** - Project configurations and settings
+- **API Keys** - Authentication tokens and access control
+- **System Settings** - Application configuration and preferences
+
+**Why PostgreSQL**:
+
+- **ACID Compliance** - Ensures data consistency for critical user data
+- **Relational Integrity** - Maintains complex relationships between users, projects, and permissions
+- **Mature Ecosystem** - Well-established tooling and operational practices
+- **Azure Integration** - Native Azure Database for PostgreSQL support
+
+### ClickHouse: Analytics Data Store
+
+**Purpose**: Handles high-volume time-series data and complex analytical queries with sub-second response times.
+
+**Data Types Stored**:
+
+- **Traces** - Complete execution records of AI workflows
+- **Observations** - Individual steps and operations within traces
+- **Scores** - Quality metrics and evaluation results
+- **Analytics Aggregations** - Pre-computed statistics and metrics
+
+**Why ClickHouse**:
+
+- **Columnar Storage** - Optimized for analytical queries across large datasets
+- **High Compression** - Reduces storage costs for time-series data
+- **Parallel Processing** - Scales horizontally for complex aggregations
+- **Real-time Ingestion** - Handles high-volume trace data efficiently
+
+## ClickHouse Replication Architecture
+
+### Replication Strategy
+
+LangFuse deploys ClickHouse in a **3-replica configuration** to ensure high availability and data durability:
+
+- **3 ClickHouse Pods**: `shard0-0`, `shard0-1`, `shard0-2`
+- **Replication Engine**: `ReplicatedReplacingMergeTree`
+- **Coordination**: ZooKeeper ensemble for distributed consensus
+
+### ZooKeeper's Critical Role
+
+**What ZooKeeper Does**:
+
+- **Metadata Coordination** - Manages table schemas and replication metadata
+- **Consensus Management** - Ensures all replicas agree on data operations
+- **Failure Detection** - Monitors replica health and handles failovers
+- **UUID Management** - Maintains unique identifiers for replication groups
+
+**Why ZooKeeper is Essential**:
+
+- **Split-Brain Prevention** - Prevents data inconsistencies during network partitions
+- **Automatic Recovery** - Enables replicas to resynchronize after failures
+- **Schema Evolution** - Coordinates schema changes across all replicas
+- **Performance Optimization** - Manages query distribution and load balancing
+
+### Replication Process
+
+This diagram shows how data flows through the ClickHouse replication system when new trace data arrives. ZooKeeper coordinates the replication to ensure all replicas stay synchronized:
+
+```{mermaid}
+sequenceDiagram
+    participant App as LangFuse App
+    participant CH1 as ClickHouse Replica 1
+    participant CH2 as ClickHouse Replica 2
+    participant CH3 as ClickHouse Replica 3
+    participant ZK as ZooKeeper Ensemble
+    
+    App->>CH1: Insert trace data
+    CH1->>ZK: Register operation
+    ZK->>CH2: Notify replication needed
+    ZK->>CH3: Notify replication needed
+    CH2->>CH1: Fetch new data
+    CH3->>CH1: Fetch new data
+    CH2->>ZK: Confirm replication
+    CH3->>ZK: Confirm replication
+    ZK->>CH1: All replicas synchronized
+```
+
+## Database Schema Structure
+
+### ClickHouse Schema Components
+
+The ClickHouse database contains **13 critical tables and views**:
+
+#### Core Replicated Tables (6 tables)
+| Table | Engine | Purpose |
+|-------|--------|---------|
+| `traces` | ReplicatedReplacingMergeTree | Main trace records for LLM requests |
+| `observations` | ReplicatedReplacingMergeTree | Nested steps/observations within traces |
+| `scores` | ReplicatedReplacingMergeTree | Quality scores and evaluations |
+| `blob_storage_file_log` | ReplicatedReplacingMergeTree | File storage references |
+| `project_environments` | ReplicatedAggregatingMergeTree | Project environment aggregations |
+| `schema_migrations` | ReplicatedMergeTree | Migration version tracking |
+
+#### Analytics Views (3 views)
+- `analytics_observations` - Hourly observation statistics
+- `analytics_scores` - Hourly score statistics  
+- `analytics_traces` - Hourly trace statistics
+
+#### Materialized Views (3 views)
+- `project_environments_observations_mv`
+- `project_environments_scores_mv`
+- `project_environments_traces_mv`
+
+#### Event Log (1 table)
+- `event_log` - Non-replicated local table for system events
+
+## Performance Characteristics
+
+### Query Performance
+
+**PostgreSQL Workloads**:
+
+- **User Authentication** - Sub-millisecond response times
+- **Project Management** - Simple CRUD operations
+- **Configuration Queries** - Cached and optimized
+
+**ClickHouse Workloads**:
+
+- **Trace Queries** - Complex aggregations across millions of records
+- **Analytics Dashboards** - Real-time metrics and visualizations
+- **Time-Series Analysis** - Historical trend analysis
+
+### Scaling Behavior
+
+**PostgreSQL Scaling**:
+
+- **Vertical Scaling** - Increase CPU/memory for higher concurrency
+- **Read Replicas** - Distribute read queries across replicas
+- **Connection Pooling** - Optimize connection management
+
+**ClickHouse Scaling**:
+
+- **Horizontal Scaling** - Add more replicas for increased query throughput
+- **Sharding** - Distribute data across multiple shards (future capability)
+- **Compression** - Automatic data compression reduces storage requirements
+
+## Operational Considerations
+
+### Backup and Recovery
+
+**PostgreSQL**:
+
+- **Point-in-Time Recovery** - Azure Database for PostgreSQL automated backups
+- **Cross-Region Replication** - Geographic disaster recovery
+- **Schema Migrations** - Managed through application deployment
+
+**ClickHouse**:
+
+- **Replica Redundancy** - Data automatically replicated across 3 nodes
+- **ZooKeeper Metadata** - Critical for replica coordination and recovery
+- **Incremental Backups** - Efficient backup of time-series data
+
+### Monitoring and Alerting
+
+**Key Metrics to Monitor**:
+
+- **PostgreSQL**: Connection count, query performance, disk usage
+- **ClickHouse**: Replication lag, query latency, replica health
+- **ZooKeeper**: Ensemble health, metadata consistency, leader elections
+
+## Common Issues and Prevention
+
+### Replication Synchronization Problems
+
+**Symptoms**: Inconsistent data across UI refreshes, "empty traces" appearing intermittently
+
+**Root Cause**: UUID mismatches between replicas creating isolated replication groups
+
+**Prevention**: 
+
+- Never delete PVCs without proper backup procedures
+- Monitor replication status regularly
+- Verify UUID consistency after scaling operations
+
+### Memory Exhaustion
+
+**Symptoms**: ZooKeeper OOM errors, cascading failures across components
+
+**Root Cause**: Insufficient memory allocation for ZooKeeper coordination tasks
+
+**Prevention**:
+
+- Set appropriate memory limits for ZooKeeper pods
+- Monitor memory usage trends
+- Scale resources proactively
+
+## Next Steps
+
+Now that you understand the database architecture:
+
+**For Deployment**:
+
+- **[Azure Deployment Guide](../how-to/azure-deployment.qmd)** - Deploy with proper database configuration
+- **[ClickHouse Troubleshooting](../how-to/clickhouse-troubleshooting.qmd)** - Resolve database-specific issues
+
+**For Operations**:
+
+- **[Deployment Troubleshooting](../how-to/deployment-troubleshooting.qmd)** - General deployment issues
+- **[User Management](../how-to/user-management.qmd)** - PostgreSQL user operations
+
+**For Understanding**:
+
+- **[Azure Architecture](azure-architecture.qmd)** - Overall infrastructure components
+- **[Observability Hierarchy](observability-hierarchy.qmd)** - How data flows through the system
+
+---
+
+*This dual-database architecture provides the foundation for LangFuse's ability to handle both operational workloads and high-performance analytics at scale.*

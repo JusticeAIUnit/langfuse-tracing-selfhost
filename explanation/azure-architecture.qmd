@@ -63,9 +63,13 @@ graph TB
 **Why important**: Ensures your application stays running, scales with demand, and handles updates without downtime.
 
 ### **PostgreSQL Database**
-**What it does**: Stores all your LangFuse data including traces, user accounts, and analytics.
+**What it does**: Stores operational data including user accounts, organizations, projects, API keys, and system settings.
 
-**Why important**: Provides reliable data storage with automatic backups and high availability.
+**Why important**: Provides reliable ACID-compliant storage for critical user management data with automatic backups and high availability.
+
+::: {.callout-note}
+**Database Architecture**: LangFuse uses a dual-database architecture. PostgreSQL handles user management, while ClickHouse manages high-volume analytics data. See [Database Architecture](database-architecture.qmd) for complete details.
+:::
 
 ### **DNS Zone**
 **What it does**: Manages your domain name and directs traffic to your LangFuse instance.
@@ -87,7 +91,7 @@ graph TB
 1. **Users access** your LangFuse domain through their browser
 2. **DNS Zone** directs them to the Application Gateway
 3. **Application Gateway** handles SSL encryption and forwards requests to LangFuse
-4. **LangFuse application** processes requests and stores data in PostgreSQL
+4. **LangFuse application** processes requests and stores data in PostgreSQL (user data) and ClickHouse (observability data)
 5. **cert-manager** automatically manages SSL certificates using Let's Encrypt
 6. **Email notifications** are sent through Communication Services when needed
 
@@ -98,7 +102,8 @@ When you deploy LangFuse, Terraform automatically creates:
 - **1 Resource Group** containing all components
 - **1 Application Gateway** for load balancing and SSL
 - **1 AKS cluster** with 2-10 automatically scaling nodes
-- **1 PostgreSQL database** with high availability
+- **1 PostgreSQL database** with high availability (user management)
+- **ClickHouse and ZooKeeper** deployed within AKS (traces, observations, scores)
 - **1 DNS zone** for your domain
 - **1 Key Vault** for secure storage
 - **1 Communication Services** resource (optional, for email)
@@ -109,7 +114,8 @@ The architecture automatically handles varying workloads:
 
 - **AKS nodes** scale up during high usage and down during quiet periods
 - **LangFuse pods** can be scaled independently based on demand
-- **PostgreSQL** provides consistent performance with automatic maintenance
+- **PostgreSQL** provides consistent performance for user operations with automatic maintenance
+- **ClickHouse** handles high-volume observability queries (traces, observations, scores) with horizontal scaling
 - **Application Gateway** distributes traffic efficiently across multiple instances
 
 ## Security Features

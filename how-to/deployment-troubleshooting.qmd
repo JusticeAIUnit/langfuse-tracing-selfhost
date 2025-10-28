@@ -23,6 +23,10 @@ categories: ["Infrastructure & Deployment", "Troubleshooting"]
 **Quick Fix**: Most Azure deployment issues are timing-related and resolve with a simple retry after waiting 30-60 seconds.
 :::
 
+::: {.callout-note}
+**Database-Specific Issues**: For ClickHouse replication problems, ZooKeeper coordination issues, or Bitnami registry migration errors, see the dedicated [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd).
+:::
+
 ## Common Deployment Issues
 
 ### Permission Errors
@@ -661,6 +665,10 @@ az group show --name <YOUR_RESOURCE_GROUP>
 
 # List all resources
 az resource list --resource-group <YOUR_RESOURCE_GROUP> --output table
+
+# Check LangFuse pods and database components
+kubectl get pods -n langfuse
+kubectl get statefulset -n langfuse
 ```
 
 ### 2. Validate Terraform State
@@ -718,6 +726,9 @@ terraform apply -auto-approve
 | **535 5.7.3 Authentication unsuccessful** | SMTP client secret mismatch | Update SMTP_CONNECTION_URL with correct client secret (see SMTP Email Delivery Issues) |
 | **Emails not delivered but no UI errors** | SMTP authentication failing silently | Check LangFuse logs for SMTP errors (see SMTP Email Delivery Issues) |
 | **"Same provider" SSO error** | Existing password-based user blocks SSO | Delete user record to allow fresh SSO setup (see [User Management Guide](user-management.qmd)) |
+| **Inconsistent UI data on refresh** | ClickHouse replica UUID mismatch | See [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd) |
+| **ImagePullBackOff with bitnami images** | Bitnami registry migration (Aug 2025) | Use bitnamilegacy registry (see [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd)) |
+| **ZooKeeper OOM errors** | Memory exhaustion in coordination layer | Increase ZooKeeper memory limits (see [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd)) |
 
 ## Comprehensive Troubleshooting Reference
 

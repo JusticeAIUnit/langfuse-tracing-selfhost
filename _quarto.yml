@@ -18,6 +18,8 @@ website:
             file: explanation/self-hosting.qmd
           - text: "Azure Architecture"
             file: explanation/azure-architecture.qmd
+          - text: "Database Architecture"
+            file: explanation/database-architecture.qmd
           - text: "Observability Hierarchy"
             file: explanation/observability-hierarchy.qmd
       - text: "Learning"
@@ -46,6 +48,8 @@ website:
             file: how-to/user-management.qmd
           - text: "Deployment Troubleshooting"
             file: how-to/deployment-troubleshooting.qmd
+          - text: "ClickHouse Troubleshooting"
+            file: how-to/clickhouse-troubleshooting.qmd
     right:
       - icon: github
         href: https://github.com/JusticeAIUnit/langfuse-tracing-selfhost

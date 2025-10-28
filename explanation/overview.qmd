@@ -73,6 +73,37 @@ Ready to add observability to your AI applications?
 1. **[Quick Start Guide](../tutorials/quickstart.qmd)** - Learn by doing (Tutorial)
 2. **[Basic Python Tracing](../tutorials/basic.qmd)** - Step-by-step learning (Tutorial)
 
+## Architecture Overview
+
+<div style="text-align: center;">
+
+```{mermaid}
+graph LR
+    subgraph DE ["Application Environment"]
+        A[Your App] --> B[LangFuse SDK]
+    end
+    
+    subgraph SH ["Self-Hosted in AKS"]
+        C[LangFuse Server]
+        D[PostgreSQL<br/>User Management]
+        E[ClickHouse<br/>Observability Data]
+        F[Web UI]
+        C --> D
+        C --> E
+        C --> F
+    end
+    
+    B --> C
+```
+
+</div>
+
+LangFuse operates as a separate service that receives trace data from your applications, providing a centralized platform for monitoring and analysis while keeping your core application logic unchanged.
+
+::: {.callout-note}
+**Database Architecture**: LangFuse uses a sophisticated dual-database system - PostgreSQL for user management and ClickHouse for high-performance observability data (traces, observations, scores). Learn more in the [Database Architecture Guide](database-architecture.qmd).
+:::
+
 ## Where to Go Next
 
 Based on your experience level and goals:
@@ -92,29 +123,5 @@ Based on your experience level and goals:
 3. **[Email Notifications](../how-to/email-notifications.qmd)** - Enable user invitations (How-to guide)
 
 **Need Help?**
-- **[Deployment Troubleshooting](../how-to/deployment-troubleshooting.qmd)** - Common issues and solutions
-
-## Architecture Overview
-
-<div style="text-align: center;">
-
-```{mermaid}
-graph LR
-    subgraph DE ["Application Environment"]
-        A[Your App] --> B[LangFuse SDK]
-    end
-    
-    subgraph SH ["Self-Hosted in AKS"]
-        C[LangFuse Server]
-        D[Database]
-        E[Web UI]
-        C --> D
-        C --> E
-    end
-    
-    B --> C
-```
-
-</div>
-
-LangFuse operates as a separate service that receives trace data from your applications, providing a centralized platform for monitoring and analysis while keeping your core application logic unchanged. 
+- **[Deployment Troubleshooting](../how-to/deployment-troubleshooting.qmd)** - Common Azure deployment issues
+- **[ClickHouse Troubleshooting](../how-to/clickhouse-troubleshooting.qmd)** - Database replication and ZooKeeper issues 
