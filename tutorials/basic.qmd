@@ -18,6 +18,7 @@ This tutorial will teach you the fundamental patterns for implementing LangFuse 
 ## Learning Objectives
 
 By the end of this tutorial, you'll be able to:
+
 - Use decorator-based tracing effectively
 - Create manual traces for complex workflows
 - Handle errors and debugging scenarios
