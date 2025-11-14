@@ -13,8 +13,6 @@ categories: ["Application Tracing", "Python"]
 **🛠️ How-to Guide** - This guide shows you how to implement comprehensive tracing using the official LangFuse Python SDK with full control over trace structure and metadata.
 :::
 
-# Using the LangFuse Python SDK for Detailed Tracing
-
 **Problem**: You need precise control over your traces, spans, and metadata while maintaining the reliability and features of the official LangFuse Python SDK.
 
 **Solution**: Use the LangFuse Python SDK's decorator-based tracing with the `@observe` decorator. This approach provides excellent control over trace structure while benefiting from automatic retries, error handling, and SDK features.

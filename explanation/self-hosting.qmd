@@ -13,8 +13,6 @@ categories: ["Concepts", "Infrastructure & Deployment"]
 **📚 Explanation** - This page explains the concept of self-hosting LangFuse, why it matters for data governance, and the spectrum of deployment approaches available.
 :::
 
-# Understanding Self-Hosted LangFuse
-
 Self-hosting LangFuse means running your own instance of the LangFuse observability platform within your organization's infrastructure, rather than using a cloud-hosted service managed by a third party.
 
 ## What is Self-Hosting?

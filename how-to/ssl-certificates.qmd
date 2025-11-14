@@ -13,8 +13,6 @@ categories: ["Infrastructure & Deployment", "SSL", "Security"]
 **🛠️ How-to Guide** - This guide shows you how to configure trusted SSL certificates using Let's Encrypt for your LangFuse deployment.
 :::
 
-# Configuring SSL Certificates for LangFuse
-
 **Problem**: Your LangFuse deployment uses self-signed certificates that cause browser warnings and prevent proper API access.
 
 **Solution**: Configure automatic SSL certificate management using Let's Encrypt and cert-manager to provide trusted certificates that auto-renew.

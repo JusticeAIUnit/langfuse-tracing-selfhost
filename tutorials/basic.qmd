@@ -13,8 +13,6 @@ categories: ["Getting Started", "Python"]
 **🎓 Tutorial** - This tutorial teaches you essential Python tracing patterns through hands-on exercises. You'll build skills progressively from simple to advanced patterns.
 :::
 
-# Basic Python Tracing Tutorial
-
 This tutorial will teach you the fundamental patterns for implementing LangFuse tracing in your Python applications. You'll learn by building increasingly complex examples.
 
 ## Learning Objectives

@@ -13,8 +13,6 @@ categories: ["Application Tracing", "Python", "OpenTelemetry"]
 **🛠️ How-to Guide** - This guide shows you how to implement standards-based tracing using OpenTelemetry semantic conventions for generative AI systems with LangFuse.
 :::
 
-# Using OpenTelemetry for AI Application Tracing
-
 **Problem**: You want to implement standardized, vendor-neutral tracing for your AI applications that follows industry conventions and can be easily understood by other developers and tools.
 
 **Solution**: Use OpenTelemetry with the [semantic conventions for generative AI systems](https://opentelemetry.io/docs/specs/semconv/gen-ai/){target="_blank"} to create consistent, standardized traces that work with LangFuse and other observability platforms.

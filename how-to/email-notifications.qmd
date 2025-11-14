@@ -13,8 +13,6 @@ categories: ["Infrastructure & Deployment", "Email", "Azure"]
 **🛠️ How-to Guide** - This guide shows you how to configure email notifications using Azure Communication Services SMTP for user onboarding and system notifications.
 :::
 
-# Setting Up Email Notifications for LangFuse
-
 **Problem**: Your LangFuse deployment cannot send emails for user invitations, password resets, or system notifications, preventing colleague onboarding.
 
 **Solution**: Configure Azure Communication Services SMTP to enable email functionality for user management and notifications.
