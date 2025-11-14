@@ -13,8 +13,6 @@ categories: ["Concepts", "Infrastructure & Deployment", "Database"]
 **📚 Explanation** - This page explains LangFuse's sophisticated database architecture, including why it uses multiple database systems and how they work together to provide high-performance observability.
 :::
 
-# Understanding LangFuse Database Architecture
-
 LangFuse uses a sophisticated dual-database architecture designed to handle both operational data and high-volume analytics workloads efficiently. Understanding this architecture is crucial for effective deployment, troubleshooting, and performance optimization.
 
 ## Dual Database Architecture Overview

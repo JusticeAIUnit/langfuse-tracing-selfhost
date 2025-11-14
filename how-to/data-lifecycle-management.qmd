@@ -13,8 +13,6 @@ categories: ["Infrastructure & Deployment", "Database", "Data Management"]
 **🛠️ How-to Guide** - This guide helps you implement Time To Live (TTL) rules for automatic data lifecycle management in your LangFuse deployment, ensuring compliance with data protection retention policies.
 :::
 
-# Data Lifecycle Management with TTL
-
 **Problem**: Your LangFuse deployment is accumulating large volumes of trace data over time, leading to storage costs, performance degradation, or non-compliance with data protection retention policies.
 
 **Solution**: Implement ClickHouse TTL (Time To Live) rules to automatically manage data retention on a per-project basis, ensuring optimal performance and storage efficiency.

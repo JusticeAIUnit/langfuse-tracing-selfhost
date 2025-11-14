@@ -13,8 +13,6 @@ categories: ["Infrastructure & Deployment", "Azure", "Terraform"]
 **🛠️ How-to Guide** - This guide walks you through deploying LangFuse on Azure using Terraform, including DNS configuration and initial validation.
 :::
 
-# Deploying LangFuse on Azure with Terraform
-
 **Problem**: You need to deploy a self-hosted LangFuse instance on Azure infrastructure for your organization's AI observability needs.
 
 **Solution**: Use the official LangFuse Terraform module to deploy a production-ready LangFuse instance on Azure Kubernetes Service (AKS) with Application Gateway, PostgreSQL, and proper DNS configuration.

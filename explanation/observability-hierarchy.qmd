@@ -13,8 +13,6 @@ categories: ["Concepts", "Observability"]
 **📚 Explanation** - This page explains how to structure your observability data using LangFuse's three-level hierarchy: Sessions, Traces, and Spans.
 :::
 
-# Understanding the LangFuse Observability Hierarchy
-
 Before implementing LangFuse in your AI applications, it's crucial to understand the three-level hierarchy that organizes your observability data. This structure helps you track everything from individual operations to entire user sessions.
 
 ## The Three-Level Hierarchy

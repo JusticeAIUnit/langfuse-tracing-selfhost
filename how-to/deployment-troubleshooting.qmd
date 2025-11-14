@@ -13,8 +13,6 @@ categories: ["Infrastructure & Deployment", "Troubleshooting"]
 **🛠️ How-to Guide** - This guide helps you diagnose and resolve common issues encountered during LangFuse deployment on Azure.
 :::
 
-# Deployment Troubleshooting
-
 **Problem**: You're encountering errors during LangFuse deployment or post-deployment configuration.
 
 **Solution**: This comprehensive troubleshooting guide covers the most common deployment issues with specific solutions based on real deployment experience.

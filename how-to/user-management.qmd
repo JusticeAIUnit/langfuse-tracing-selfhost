@@ -13,8 +13,6 @@ categories: ["User Management", "Authentication", "Troubleshooting"]
 **🛠️ How-to Guide** - This guide helps you manage LangFuse users and resolve issues when migrating from password-based authentication to Azure AD SSO.
 :::
 
-# User Management and SSO Migration
-
 **Problem**: You're encountering authentication errors when migrating existing users from password-based authentication to Azure AD SSO, or need to manage user accounts in the database.
 
 **Solution**: This guide provides specific database operations to resolve SSO migration issues and manage user accounts effectively.

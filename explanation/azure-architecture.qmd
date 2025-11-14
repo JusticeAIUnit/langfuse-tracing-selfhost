@@ -13,8 +13,6 @@ categories: ["Concepts", "Infrastructure & Deployment", "Azure"]
 **📚 Explanation** - This page explains the Azure infrastructure components required for a production LangFuse deployment and how they work together.
 :::
 
-# Understanding Azure Architecture for LangFuse
-
 Before deploying LangFuse on Azure, it's helpful to understand the main infrastructure components that work together to create a production-ready observability platform.
 
 ## Architecture Overview

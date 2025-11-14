@@ -13,8 +13,6 @@ categories: ["Infrastructure & Deployment", "Troubleshooting", "Database"]
 **🛠️ How-to Guide** - This guide helps you diagnose and resolve issues specific to ClickHouse replication and ZooKeeper coordination in LangFuse deployments.
 :::
 
-# ClickHouse and ZooKeeper Troubleshooting
-
 **Problem**: You're experiencing data inconsistencies, replication failures, or image pull issues related to ClickHouse and ZooKeeper components.
 
 **Solution**: This comprehensive guide covers the most critical ClickHouse and ZooKeeper issues based on real production troubleshooting experience.
