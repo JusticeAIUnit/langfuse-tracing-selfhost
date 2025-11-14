@@ -532,6 +532,7 @@ For broader deployment issues, see:
 
 - **[Deployment Troubleshooting](deployment-troubleshooting.qmd)** - General Azure deployment issues
 - **[Database Architecture](../explanation/database-architecture.qmd)** - Understanding the dual database system
+- **[Data Lifecycle Management](data-lifecycle-management.qmd)** - TTL rules for automatic data retention and cleanup
 - **[Azure Architecture](../explanation/azure-architecture.qmd)** - Overall infrastructure components
 
 ---

@@ -221,6 +221,7 @@ The ClickHouse database contains **13 critical tables and views**:
 - **Horizontal Scaling** - Add more replicas for increased query throughput
 - **Sharding** - Distribute data across multiple shards (future capability)
 - **Compression** - Automatic data compression reduces storage requirements
+- **TTL Management** - Automatic data lifecycle management with Time To Live rules
 
 ## Operational Considerations
 
@@ -285,6 +286,7 @@ Now that you understand the database architecture:
 
 - **[Deployment Troubleshooting](../how-to/deployment-troubleshooting.qmd)** - General deployment issues
 - **[User Management](../how-to/user-management.qmd)** - PostgreSQL user operations
+- **[Data Lifecycle Management](../how-to/data-lifecycle-management.qmd)** - TTL rules for automatic data retention
 
 **For Understanding**:
 

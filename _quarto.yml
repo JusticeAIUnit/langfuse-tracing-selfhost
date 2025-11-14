@@ -50,6 +50,8 @@ website:
             file: how-to/deployment-troubleshooting.qmd
           - text: "ClickHouse Troubleshooting"
             file: how-to/clickhouse-troubleshooting.qmd
+          - text: "Data Lifecycle Management"
+            file: how-to/data-lifecycle-management.qmd
     right:
       - icon: github
         href: https://github.com/JusticeAIUnit/langfuse-tracing-selfhost

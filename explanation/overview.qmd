@@ -124,4 +124,5 @@ Based on your experience level and goals:
 
 **Need Help?**
 - **[Deployment Troubleshooting](../how-to/deployment-troubleshooting.qmd)** - Common Azure deployment issues
-- **[ClickHouse Troubleshooting](../how-to/clickhouse-troubleshooting.qmd)** - Database replication and ZooKeeper issues 
+- **[ClickHouse Troubleshooting](../how-to/clickhouse-troubleshooting.qmd)** - Database replication and ZooKeeper issues
+- **[Data Lifecycle Management](../how-to/data-lifecycle-management.qmd)** - TTL rules for automatic data retention 
