@@ -1,0 +1,337 @@
+---
+title: "ClickHouse Replication Architecture"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "explanation"
+  purpose: "Understanding-oriented - Deep dive into ClickHouse replication mechanics and table architecture in LangFuse"
+categories: ["Infrastructure & Deployment", "Database", "Architecture"]
+---
+
+::: {.callout-note icon="false"}
+**📚 Explanation** - This article provides deep understanding of ClickHouse replication architecture, table relationships, and coordination mechanisms in LangFuse deployments.
+:::
+
+## Overview
+
+LangFuse uses ClickHouse as its primary analytics data store, deployed in a 3-replica configuration for high availability and performance. Understanding this architecture is crucial for troubleshooting replication issues and ensuring data consistency.
+
+::: {.callout-important}
+**Critical Understanding**: ClickHouse replication in LangFuse involves 13+ tables and views that must be perfectly synchronized across all replicas. Missing or inconsistent tables cause specific UI failures.
+:::
+
+## Replication Strategy
+
+### Three-Replica Architecture
+
+LangFuse deploys ClickHouse with **3 identical replicas** to ensure:
+
+- **High Availability** - Service continues if one replica fails
+- **Load Distribution** - Queries distributed across healthy replicas  
+- **Data Durability** - Multiple copies prevent data loss
+- **Performance Scaling** - Parallel query processing
+
+**Replica Configuration**:
+
+- **Primary**: `langfuse-clickhouse-shard0-0` 
+- **Secondary**: `langfuse-clickhouse-shard0-1`
+- **Tertiary**: `langfuse-clickhouse-shard0-2`
+
+### ZooKeeper Coordination
+
+**ZooKeeper's Critical Role**:
+
+ZooKeeper acts as the coordination layer that makes replication possible:
+
+- **Metadata Management** - Stores table schemas and replication metadata
+- **Consensus Coordination** - Ensures all replicas agree on operations
+- **Failure Detection** - Monitors replica health and coordinates recovery
+- **UUID Management** - Maintains unique identifiers for replication groups
+- **Split-Brain Prevention** - Prevents data inconsistencies during network issues
+
+**ZooKeeper Metadata Structure**:
+```
+/clickhouse/tables/{table-uuid}/shard0/
+├── replicas/
+│   ├── langfuse-clickhouse-shard0-0/  ← Primary replica metadata
+│   ├── langfuse-clickhouse-shard0-1/  ← Secondary replica metadata
+│   └── langfuse-clickhouse-shard0-2/  ← Tertiary replica metadata
+├── log/                               ← Replication operation log
+├── blocks/                            ← Data block coordination
+└── mutations/                         ← Schema change coordination
+```
+
+## Complete Table Architecture
+
+### Core Replicated Tables (6 tables)
+
+These tables use `ReplicatedReplacingMergeTree` or `ReplicatedAggregatingMergeTree` engines and must exist on all replicas:
+
+| Table | Engine | Purpose | Data Volume | UI Dependencies |
+|-------|--------|---------|-------------|-----------------|
+| `traces` | ReplicatedReplacingMergeTree | Main trace records for LLM requests | High | Traces page, trace details |
+| `observations` | ReplicatedReplacingMergeTree | Nested steps/observations within traces | Very High | Trace timeline, span details |
+| `scores` | ReplicatedReplacingMergeTree | Quality scores and evaluations | Medium | Sessions page, score analytics |
+| `blob_storage_file_log` | ReplicatedReplacingMergeTree | File storage references and metadata | Low | File attachments, uploads |
+| `project_environments` | ReplicatedAggregatingMergeTree | Project environment aggregations | Low | Environment filtering |
+| `schema_migrations` | ReplicatedMergeTree | Database migration version tracking | Very Low | Schema consistency |
+
+### Analytics Views (3 views)
+
+These views provide pre-aggregated analytics data:
+
+| View | Source Tables | Purpose | UI Dependencies |
+|------|---------------|---------|-----------------|
+| `analytics_traces` | `traces` | Hourly trace statistics by project | Dashboard metrics, trace analytics |
+| `analytics_observations` | `observations` | Hourly observation statistics by project | Dashboard metrics, observation analytics |
+| `analytics_scores` | `scores` | Hourly score statistics by project | Dashboard metrics, score analytics |
+
+### Materialized Views (3 views)
+
+These views provide real-time aggregations:
+
+| View | Target Table | Purpose | UI Dependencies |
+|------|--------------|---------|-----------------|
+| `project_environments_traces_mv` | `project_environments` | Real-time trace count aggregations | Live dashboard metrics |
+| `project_environments_observations_mv` | `project_environments` | Real-time observation count aggregations | Live dashboard metrics |
+| `project_environments_scores_mv` | `project_environments` | Real-time score count aggregations | Live dashboard metrics |
+
+### Supporting Tables (1 table)
+
+| Table | Engine | Purpose | UI Dependencies |
+|-------|--------|---------|-----------------|
+| `event_log` | MergeTree | System event logging and audit trail | Event tracking, system logs |
+
+## Table Relationships and Data Flow
+
+```{mermaid}
+erDiagram
+    traces ||--o{ observations : "contains"
+    traces ||--o{ scores : "evaluated_by"
+    observations ||--o{ scores : "scored_by"
+    traces }o--|| project_environments : "belongs_to"
+    
+    traces {
+        string id PK
+        string project_id FK
+        datetime timestamp
+        string name
+        string input
+        string output
+        string metadata
+        boolean is_deleted
+        datetime event_ts
+    }
+    
+    observations {
+        string id PK
+        string trace_id FK
+        string parent_observation_id FK
+        string project_id FK
+        datetime timestamp
+        string name
+        string type
+        string input
+        string output
+        string metadata
+        boolean is_deleted
+    }
+    
+    scores {
+        string id PK
+        string trace_id FK
+        string observation_id FK
+        string project_id FK
+        datetime timestamp
+        string name
+        float value
+        string source
+        string config
+        boolean is_deleted
+    }
+    
+    project_environments {
+        string project_id PK
+        string metric_type
+        int value
+    }
+    
+    blob_storage_file_log {
+        string id PK
+        string project_id FK
+        datetime timestamp
+        string filename
+        string content_type
+        int size
+        string storage_path
+    }
+```
+
+## Replication Process Deep Dive
+
+### Data Ingestion Flow
+
+When new trace data arrives in LangFuse:
+
+```{mermaid}
+sequenceDiagram
+    participant App as LangFuse App
+    participant LB as Load Balancer
+    participant CH1 as ClickHouse Replica 1
+    participant CH2 as ClickHouse Replica 2
+    participant CH3 as ClickHouse Replica 3
+    participant ZK as ZooKeeper Ensemble
+    
+    App->>LB: Insert trace data
+    LB->>CH1: Route to primary replica
+    CH1->>ZK: Register insert operation
+    CH1->>CH1: Write data locally
+    ZK->>CH2: Notify replication needed
+    ZK->>CH3: Notify replication needed
+    CH2->>CH1: Fetch replication log
+    CH3->>CH1: Fetch replication log
+    CH2->>CH2: Apply replicated data
+    CH3->>CH3: Apply replicated data
+    CH2->>ZK: Confirm replication complete
+    CH3->>ZK: Confirm replication complete
+    ZK->>CH1: All replicas synchronized
+```
+
+### Query Distribution
+
+For read queries, the load balancer distributes requests across healthy replicas:
+
+```{mermaid}
+sequenceDiagram
+    participant UI as LangFuse UI
+    participant LB as Load Balancer
+    participant CH1 as ClickHouse Replica 1
+    participant CH2 as ClickHouse Replica 2
+    participant CH3 as ClickHouse Replica 3
+    
+    UI->>LB: Query traces
+    alt Replica 1 selected
+        LB->>CH1: Execute query
+        CH1->>LB: Return results
+    else Replica 2 selected
+        LB->>CH2: Execute query
+        CH2->>LB: Return results
+    else Replica 3 selected
+        LB->>CH3: Execute query
+        CH3->>LB: Return results
+    end
+    LB->>UI: Return query results
+```
+
+## UI Impact of Missing Tables
+
+Understanding which UI components depend on specific tables is crucial for diagnosing issues:
+
+### Critical UI Dependencies
+
+| UI Component | Required Tables | Failure Symptoms |
+|--------------|-----------------|------------------|
+| **Traces Page** | `traces`, `analytics_traces` | Empty page, "No traces found" |
+| **Trace Details** | `traces`, `observations` | Incomplete timeline, missing spans |
+| **Sessions Page** | `traces`, `scores`, `project_environments_*_mv` | "Internal Server Error - sessions.all" |
+| **Dashboard Metrics** | `analytics_*` views, `project_environments` | Missing charts, zero metrics |
+| **Environment Filter** | `project_environments` | Empty dropdown, filter broken |
+| **File Attachments** | `blob_storage_file_log` | Upload failures, missing files |
+| **Score Analytics** | `scores`, `analytics_scores` | Missing score data, broken charts |
+
+### Cascading Failure Patterns
+
+Missing tables create cascading failures:
+
+1. **Missing `scores` table** → Sessions page crashes → Users can't access session analytics
+2. **Missing `project_environments`** → Environment filtering breaks → Users can't filter by environment
+3. **Missing analytics views** → Dashboard shows zero metrics → Monitoring appears broken
+4. **Missing materialized views** → Real-time metrics stop updating → Live dashboards freeze
+
+## Replication Engine Details
+
+### ReplicatedReplacingMergeTree
+
+Most core tables use this engine, which provides:
+
+- **Automatic Deduplication** - Handles duplicate inserts gracefully
+- **Eventual Consistency** - Guarantees data will be consistent across replicas
+- **Optimistic Concurrency** - High performance for concurrent writes
+- **Version-based Replacement** - Newer records replace older ones
+
+**Key Parameters**:
+- **ZooKeeper Path** - Must be identical across all replicas using the table's UUID
+- **Replica Name** - Unique identifier for each replica instance
+- **Version Column** - Used for deduplication (typically `event_ts`)
+- **Deletion Flag** - Column indicating soft deletes (typically `is_deleted`)
+
+### ReplicatedAggregatingMergeTree
+
+Used for `project_environments` table:
+
+- **Automatic Aggregation** - Combines multiple rows with same key
+- **State Functions** - Maintains aggregation state across merges
+- **Incremental Updates** - Efficiently handles streaming aggregations
+
+## Production Architecture Considerations
+
+### Scaling Characteristics
+
+| Aspect | Behavior | Implications |
+|--------|----------|-------------|
+| **Write Performance** | Scales with replica count | More replicas = higher write latency |
+| **Read Performance** | Scales linearly | More replicas = better read throughput |
+| **Storage Requirements** | 3x base storage | Each replica stores complete dataset |
+| **Network Overhead** | Increases with replicas | More coordination traffic |
+
+### Consistency Model
+
+ClickHouse replication provides **eventual consistency**:
+
+- **Writes** are immediately visible on the receiving replica
+- **Replication** happens asynchronously to other replicas
+- **Queries** may return different results during replication lag
+- **Consistency** is guaranteed once replication completes
+
+### Failure Scenarios
+
+| Failure Type | Impact | Recovery |
+|--------------|--------|----------|
+| **Single Replica Down** | No service impact | Automatic failover |
+| **ZooKeeper Partition** | Writes may pause | Automatic recovery when partition heals |
+| **Split-Brain** | Data inconsistency | Manual intervention required |
+| **Complete ZooKeeper Loss** | Service unavailable | Requires ZooKeeper restoration |
+
+## Monitoring and Health Indicators
+
+### Key Metrics to Monitor
+
+1. **Replication Lag** - Time between write and replication completion
+2. **Active Replicas** - Number of healthy replicas per table
+3. **Queue Size** - Pending replication operations
+4. **Data Consistency** - Row counts across replicas
+5. **ZooKeeper Health** - Coordination service availability
+
+### Health Monitoring Approach
+
+Regular monitoring should focus on:
+
+- **Replication Status** - Verify all replicas are active and synchronized
+- **Data Consistency** - Ensure identical row counts across replicas  
+- **Queue Health** - Monitor pending replication operations
+- **ZooKeeper Connectivity** - Confirm coordination service availability
+
+For specific monitoring queries and procedures, see the [ClickHouse Troubleshooting](../how-to/clickhouse-troubleshooting.qmd) guide.
+
+## Related Documentation
+
+For operational procedures and troubleshooting:
+
+- **[ClickHouse Troubleshooting](../how-to/clickhouse-troubleshooting.qmd)** - Problem-solving procedures for replication issues
+- **[Database Architecture](database-architecture.qmd)** - Overall dual-database system design
+- **[Data Lifecycle Management](../how-to/data-lifecycle-management.qmd)** - TTL rules and data retention policies
+
+---
+
+*Understanding ClickHouse replication architecture is essential for maintaining reliable LangFuse deployments and diagnosing complex data consistency issues.*

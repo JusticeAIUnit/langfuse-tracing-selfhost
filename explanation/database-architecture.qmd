@@ -165,7 +165,7 @@ sequenceDiagram
 
 ### ClickHouse Schema Components
 
-The ClickHouse database contains **13 critical tables and views**:
+The ClickHouse database contains **13 critical tables and views** that must be properly replicated across all instances. For comprehensive details on table relationships, UI dependencies, and replication mechanics, see the [ClickHouse Replication Architecture](clickhouse-replication-architecture.qmd) guide.
 
 #### Core Replicated Tables (6 tables)
 | Table | Engine | Purpose |
@@ -189,6 +189,10 @@ The ClickHouse database contains **13 critical tables and views**:
 
 #### Event Log (1 table)
 - `event_log` - Non-replicated local table for system events
+
+::: {.callout-note}
+**Table Dependencies**: Each table serves specific UI components. Missing tables cause targeted failures - for example, missing `scores` breaks the Sessions page, while missing analytics views break dashboard metrics. See the [replication architecture guide](clickhouse-replication-architecture.qmd) for complete UI impact mapping.
+:::
 
 ## Performance Characteristics
 

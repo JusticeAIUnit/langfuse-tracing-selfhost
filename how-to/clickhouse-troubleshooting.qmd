@@ -21,15 +21,14 @@ categories: ["Infrastructure & Deployment", "Troubleshooting", "Database"]
 **Critical Understanding**: ClickHouse replication issues can cause inconsistent UI behavior, where refreshing the page shows different data each time. This is typically caused by UUID mismatches between replicas.
 :::
 
-## Understanding ClickHouse in LangFuse
+## Prerequisites
 
-Before troubleshooting, it's important to understand that LangFuse uses ClickHouse for high-performance analytics queries on trace data. For a complete understanding of the database architecture, see the [Database Architecture Guide](../explanation/database-architecture.qmd).
+Before troubleshooting ClickHouse issues, ensure you understand the replication architecture. See the [ClickHouse Replication Architecture](../explanation/clickhouse-replication-architecture.qmd) guide for comprehensive details on:
 
-**Key Components**:
-
-- **3 ClickHouse replicas** for high availability
-- **ZooKeeper ensemble** for coordination
-- **13 tables/views** that must exist on all replicas
+- Complete table inventory and UI dependencies
+- ZooKeeper coordination mechanics  
+- Replication process and failure scenarios
+- Production architecture considerations
 
 ## ClickHouse Replication Synchronization Issues
 
@@ -55,6 +54,27 @@ When ClickHouse replication issues occur, the LangFuse UI may show degraded func
 - **Empty Metadata**: Trace metadata sections show empty JSON objects `{}`
 - **Timeline Disruption**: Trace timeline may be incomplete or missing spans
 
+### Symptom-Based Troubleshooting
+
+Use this table to quickly identify the root cause based on specific UI symptoms:
+
+| Symptom | Root Cause | Immediate Action |
+|---------|------------|------------------|
+| "Internal Server Error - sessions.all" | Missing `scores` table on replicas | Recreate `scores` table with correct UUID |
+| "Trace not found" errors (intermittent) | Data inconsistency across replicas | Verify data counts, force sync if needed |
+| Dashboard shows no metrics | Missing analytics views | Recreate `analytics_*` views |
+| Environment filter dropdown empty | Missing `project_environments` table | Recreate `project_environments` table |
+| File attachments fail to load/upload | Missing `blob_storage_file_log` table | Recreate `blob_storage_file_log` table |
+| Inconsistent data on page refresh | UUID mismatch between replicas | Full split-brain resolution required |
+| Sessions page crashes completely | Missing materialized views | Recreate `project_environments_*_mv` views |
+| Event tracking/logs missing | Missing `event_log` table | Recreate `event_log` table |
+| Trace details show empty timeline | Missing `observations` table | Recreate `observations` table |
+| Zero trace counts across all pages | Missing `traces` table | Recreate `traces` table |
+
+::: {.callout-tip}
+**Quick Diagnosis**: If you see inconsistent data on page refresh, this is almost always a split-brain issue requiring full resolution. Other symptoms typically indicate missing specific tables. For complete table-to-UI mapping, see the [ClickHouse Replication Architecture](../explanation/clickhouse-replication-architecture.qmd) guide.
+:::
+
 ### Root Cause Analysis
 
 **Primary Cause**: After recreating ClickHouse replicas with fresh PersistentVolumeClaims (PVCs), new replicas initialize tables with **different UUIDs** than the original replica. This creates **multiple isolated replication groups** instead of one unified cluster.
@@ -62,9 +82,9 @@ When ClickHouse replication issues occur, the LangFuse UI may show degraded func
 **Example of Broken State**:
 ```
 ✗ BROKEN STATE:
-- shard0-0: UUID bd05a9b1-9dc0-417f-93b8-22fbda0e61ba (34,264 traces)
-- shard0-1: UUID bcdf1671-85dc-4f0c-ac38-94b3c43a20e0 (34,109 traces) 
-- shard0-2: UUID bcdf1671-85dc-4f0c-ac38-94b3c43a20e0 (34,184 traces)
+- shard0-0: UUID bd05a9b1-... (34,264 traces)
+- shard0-1: UUID bcdf1671-... (34,109 traces) 
+- shard0-2: UUID bcdf1671-... (34,184 traces)
 ```
 
 Each replica contains different data, and the load balancer randomly directs queries to different replicas, causing inconsistent UI behavior.
@@ -134,22 +154,89 @@ kubectl delete pvc data-langfuse-clickhouse-shard0-1 data-langfuse-clickhouse-sh
 kubectl get pvc -n langfuse | grep clickhouse
 ```
 
-#### Step 3: Clean ZooKeeper Metadata
+#### Step 3: Comprehensive ZooKeeper Metadata Cleanup
 
-For each table UUID, remove stale replica metadata:
+::: {.callout-warning}
+**Critical Step**: Stale ZooKeeper metadata prevents proper replication. You must clean metadata for **every table UUID** and **every replica** combination.
+:::
+
+**Step 3a: Get All Table UUIDs**
 
 ```bash
-# Get UUIDs from the remaining healthy replica
-kubectl exec langfuse-clickhouse-shard0-0 -n langfuse -- clickhouse-client \
-  --password=$PASSWORD -q \
-  "SELECT table, zookeeper_path FROM system.replicas WHERE database='default'"
+# Get ALL table UUIDs from healthy replica (critical - don't miss any)
+kubectl exec langfuse-clickhouse-shard0-0 -n langfuse -- clickhouse-client --password=$PASSWORD -q \
+  "SELECT table, substring(zookeeper_path, 20, 36) as uuid FROM system.replicas WHERE database='default'"
 
-# Clean up each UUID's replica metadata (replace {UUID} with actual values)
-kubectl exec langfuse-zookeeper-0 -n langfuse -- zkCli.sh -server localhost:2181 \
-  deleteall /clickhouse/tables/{UUID}/shard0/replicas/langfuse-clickhouse-shard0-1
+# Example output:
+# traces                bd05a9b1-...
+# observations          c8f2e1a3-...
+# scores                379293dc-...
+# blob_storage_file_log 9f10e361-...
+# project_environments  50f051d7-...
+# schema_migrations     a1b2c3d4-...
+```
 
+**Step 3b: Automated Cleanup Script**
+
+```bash
+# Create cleanup script for systematic metadata removal
+cat > cleanup_zookeeper_metadata.sh << 'EOF'
+#!/bin/bash
+set -e
+
+PASSWORD="$1"
+if [ -z "$PASSWORD" ]; then
+  echo "Usage: $0 <clickhouse-password>"
+  exit 1
+fi
+
+echo "=== Getting all table UUIDs ==="
+UUIDS=$(kubectl exec langfuse-clickhouse-shard0-0 -n langfuse -- clickhouse-client --password="$PASSWORD" -q \
+  "SELECT substring(zookeeper_path, 20, 36) FROM system.replicas WHERE database='default'" | tr '\n' ' ')
+
+echo "Found UUIDs: $UUIDS"
+
+echo "=== Cleaning ZooKeeper metadata ==="
+for uuid in $UUIDS; do
+  echo "Cleaning UUID: $uuid"
+  
+  # Clean shard0-1 metadata
+  kubectl exec langfuse-zookeeper-0 -n langfuse -- zkCli.sh -server localhost:2181 \
+    deleteall /clickhouse/tables/$uuid/shard0/replicas/langfuse-clickhouse-shard0-1 2>/dev/null || true
+  
+  # Clean shard0-2 metadata  
+  kubectl exec langfuse-zookeeper-0 -n langfuse -- zkCli.sh -server localhost:2181 \
+    deleteall /clickhouse/tables/$uuid/shard0/replicas/langfuse-clickhouse-shard0-2 2>/dev/null || true
+    
+  echo "  ✓ Cleaned metadata for UUID: $uuid"
+done
+
+echo "=== Verifying cleanup ==="
+for uuid in $UUIDS; do
+  replicas=$(kubectl exec langfuse-zookeeper-0 -n langfuse -- zkCli.sh -server localhost:2181 \
+    ls /clickhouse/tables/$uuid/shard0/replicas 2>/dev/null | grep -o '\[.*\]' || echo "[]")
+  echo "UUID $uuid replicas: $replicas"
+  # Should only show: [langfuse-clickhouse-shard0-0]
+done
+
+echo "=== ZooKeeper cleanup complete ==="
+EOF
+
+chmod +x cleanup_zookeeper_metadata.sh
+
+# Run the cleanup script
+./cleanup_zookeeper_metadata.sh "$PASSWORD"
+```
+
+**Step 3c: Manual Verification**
+
+```bash
+# Verify cleanup for each UUID (replace with actual UUIDs from step 3a)
 kubectl exec langfuse-zookeeper-0 -n langfuse -- zkCli.sh -server localhost:2181 \
-  deleteall /clickhouse/tables/{UUID}/shard0/replicas/langfuse-clickhouse-shard0-2
+  ls /clickhouse/tables/bd05a9b1-9dc0-417f-93b8-22fbda0e61ba/shard0/replicas
+
+# Should only show: [langfuse-clickhouse-shard0-0]
+# If you see shard0-1 or shard0-2, the cleanup failed and must be repeated
 ```
 
 #### Step 4: Scale Back Up
@@ -267,7 +354,105 @@ FROM traces
 GROUP BY project_id;
 ```
 
-#### Step 7: Verify Replication
+#### Step 7: Force Historical Data Synchronization
+
+::: {.callout-important}
+**Critical Issue**: New replicas only receive data from the point they join the cluster. Historical data remains only on the original replica and must be force-synchronized.
+:::
+
+**Problem**: After recreating replicas with fresh PVCs, they start with empty tables and only get **new** data going forward. This causes data inconsistency where different replicas have different row counts.
+
+**Solution**: Use `DETACH TABLE` / `ATTACH TABLE` operations to trigger proper replication log replay.
+
+**Step 7a: Force Synchronization for All Replicated Tables**
+
+```bash
+# Create synchronization script
+cat > force_historical_sync.sh << 'EOF'
+#!/bin/bash
+set -e
+
+PASSWORD="$1"
+if [ -z "$PASSWORD" ]; then
+  echo "Usage: $0 <clickhouse-password>"
+  exit 1
+fi
+
+REPLICATED_TABLES=("traces" "observations" "scores" "blob_storage_file_log" "project_environments" "schema_migrations")
+
+echo "=== Forcing Historical Data Synchronization ==="
+
+for replica in langfuse-clickhouse-shard0-1 langfuse-clickhouse-shard0-2; do
+  echo "--- Synchronizing $replica ---"
+  
+  for table in "${REPLICATED_TABLES[@]}"; do
+    echo "  Syncing table: $table"
+    
+    # Detach table to reset replication state
+    kubectl exec $replica -n langfuse -- clickhouse-client --password="$PASSWORD" -q \
+      "DETACH TABLE $table" || echo "    Warning: DETACH failed for $table"
+    
+    # Wait a moment for detach to complete
+    sleep 2
+    
+    # Attach table to trigger replication log replay
+    kubectl exec $replica -n langfuse -- clickhouse-client --password="$PASSWORD" -q \
+      "ATTACH TABLE $table" || echo "    Warning: ATTACH failed for $table"
+    
+    # Force immediate synchronization
+    kubectl exec $replica -n langfuse -- clickhouse-client --password="$PASSWORD" -q \
+      "SYSTEM SYNC REPLICA $table" || echo "    Warning: SYNC failed for $table"
+    
+    echo "    ✓ Synchronized $table on $replica"
+  done
+done
+
+echo "=== Historical synchronization complete ==="
+EOF
+
+chmod +x force_historical_sync.sh
+
+# Run the synchronization script
+./force_historical_sync.sh "$PASSWORD"
+```
+
+**Step 7b: Verify Data Consistency**
+
+```bash
+# Critical: Verify identical data across all replicas
+echo "=== Data Consistency Verification ==="
+for table in traces observations scores blob_storage_file_log project_environments schema_migrations; do
+  echo "--- $table ---"
+  for pod in langfuse-clickhouse-shard0-{0,1,2}; do
+    count=$(kubectl exec $pod -n langfuse -- clickhouse-client --password=$PASSWORD -q \
+      "SELECT count() FROM $table" 2>/dev/null || echo "ERROR")
+    echo "  $pod: $count rows"
+  done
+  echo
+done
+
+# All counts MUST be identical. Different counts indicate incomplete replication.
+```
+
+**Step 7c: Alternative Method - Force Replication Log Replay**
+
+If DETACH/ATTACH doesn't work, try forcing replication log replay:
+
+```bash
+# Check current replication log positions
+kubectl exec langfuse-clickhouse-shard0-0 -n langfuse -- clickhouse-client --password=$PASSWORD -q \
+  "SELECT replica_name, log_max_index, log_pointer FROM system.replicas WHERE table='traces'"
+
+# Force log replay on new replicas for each table
+for replica in langfuse-clickhouse-shard0-1 langfuse-clickhouse-shard0-2; do
+  for table in traces observations scores blob_storage_file_log project_environments schema_migrations; do
+    kubectl exec $replica -n langfuse -- clickhouse-client --password=$PASSWORD -q \
+      "SYSTEM SYNC REPLICA $table"
+  done
+done
+```
+
+#### Step 8: Verify Complete Replication
 
 ```bash
 # Check replication health
@@ -440,6 +625,147 @@ spec:
 EOF
 ```
 
+## Production Considerations and Complexity Warnings
+
+### What to Expect in Production
+
+::: {.callout-warning}
+**Complexity Warning**: ClickHouse split-brain resolution is a high-complexity operation requiring deep understanding of distributed systems and careful execution.
+:::
+
+**Resolution Characteristics**:
+
+- **Risk Level**: High - data loss possible if executed incorrectly
+- **Dependencies**: kubectl access, ZooKeeper expertise, production downtime tolerance
+
+**Success Factors**:
+
+1. **Complete table inventory** - Missing any of the 13 tables causes UI failures
+2. **Systematic ZooKeeper cleanup** - Stale metadata prevents proper replication
+3. **Historical data synchronization** - New replicas don't get old data automatically
+4. **Data consistency verification** - Must verify identical data across all replicas
+
+### Production-Tested Verification Procedures
+
+**Complete Table Verification Script**:
+```bash
+#!/bin/bash
+# check_complete_tables.sh - Production-tested table verification
+
+PASSWORD="$1"
+if [ -z "$PASSWORD" ]; then
+  echo "Usage: $0 <clickhouse-password>"
+  exit 1
+fi
+
+REQUIRED_TABLES=(
+  "traces"
+  "observations" 
+  "scores"
+  "blob_storage_file_log"
+  "project_environments"
+  "schema_migrations"
+  "analytics_traces"
+  "analytics_observations"
+  "analytics_scores"
+  "project_environments_traces_mv"
+  "project_environments_observations_mv"
+  "project_environments_scores_mv"
+  "event_log"
+)
+
+echo "=== Complete Table Verification ==="
+for pod in langfuse-clickhouse-shard0-{0,1,2}; do
+  echo "--- $pod ---"
+  missing_tables=()
+  
+  for table in "${REQUIRED_TABLES[@]}"; do
+    exists=$(kubectl exec $pod -n langfuse -- clickhouse-client --password="$PASSWORD" -q \
+      "SELECT count() FROM system.tables WHERE name='$table' AND database='default'" 2>/dev/null || echo "0")
+    
+    if [ "$exists" = "1" ]; then
+      if [[ "$table" == *"_mv" ]] || [[ "$table" == "analytics_"* ]] || [[ "$table" == "event_log" ]]; then
+        # Non-replicated tables - just check existence
+        echo "  ✓ $table: EXISTS"
+      else
+        # Replicated tables - check row count
+        count=$(kubectl exec $pod -n langfuse -- clickhouse-client --password="$PASSWORD" -q \
+          "SELECT count() FROM $table" 2>/dev/null || echo "ERROR")
+        echo "  ✓ $table: $count rows"
+      fi
+    else
+      echo "  ✗ $table: MISSING"
+      missing_tables+=("$table")
+    fi
+  done
+  
+  if [ ${#missing_tables[@]} -gt 0 ]; then
+    echo "  ⚠️  Missing tables on $pod: ${missing_tables[*]}"
+  fi
+  echo
+done
+```
+
+**Replication Health Verification**:
+```bash
+#!/bin/bash
+# check_replication_health.sh - Production-tested replication verification
+
+PASSWORD="$1"
+if [ -z "$PASSWORD" ]; then
+  echo "Usage: $0 <clickhouse-password>"
+  exit 1
+fi
+
+echo "=== Comprehensive Replication Health Check ==="
+
+# Check basic replication status
+kubectl exec langfuse-clickhouse-shard0-0 -n langfuse -- clickhouse-client --password="$PASSWORD" -q \
+  "SELECT 
+    table,
+    replica_name,
+    is_leader,
+    total_replicas,
+    active_replicas,
+    queue_size,
+    log_max_index,
+    log_pointer,
+    CASE 
+      WHEN total_replicas = active_replicas AND queue_size = 0 THEN 'HEALTHY'
+      WHEN total_replicas = active_replicas AND queue_size > 0 THEN 'SYNCING'
+      ELSE 'DEGRADED'
+    END as status
+  FROM system.replicas 
+  WHERE database='default'
+  ORDER BY table, replica_name"
+
+echo
+echo "=== Data Consistency Verification ==="
+
+# Check data consistency for all replicated tables
+REPLICATED_TABLES=("traces" "observations" "scores" "blob_storage_file_log" "project_environments" "schema_migrations")
+
+for table in "${REPLICATED_TABLES[@]}"; do
+  echo "--- $table ---"
+  counts=()
+  
+  for pod in langfuse-clickhouse-shard0-{0,1,2}; do
+    count=$(kubectl exec $pod -n langfuse -- clickhouse-client --password="$PASSWORD" -q \
+      "SELECT count() FROM $table" 2>/dev/null || echo "ERROR")
+    counts+=("$count")
+    echo "  $pod: $count rows"
+  done
+  
+  # Check if all counts are identical
+  if [ "${counts[0]}" = "${counts[1]}" ] && [ "${counts[1]}" = "${counts[2]}" ] && [ "${counts[0]}" != "ERROR" ]; then
+    echo "  ✓ Data consistent across all replicas"
+  else
+    echo "  ✗ Data inconsistency detected - split-brain issue!"
+  fi
+  echo
+done
+```
+
 ## Prevention and Monitoring
 
 ### Replication Monitoring
@@ -465,6 +791,57 @@ done
 EOF
 
 chmod +x check_clickhouse_health.sh
+```
+
+**Direct SQL Health Checks**:
+
+For manual monitoring or integration into custom monitoring systems:
+
+```sql
+-- Check comprehensive replication status
+SELECT 
+    table,
+    total_replicas,
+    active_replicas,
+    queue_size,
+    CASE 
+        WHEN total_replicas = active_replicas AND queue_size = 0 THEN 'HEALTHY'
+        WHEN total_replicas = active_replicas AND queue_size > 0 THEN 'SYNCING'
+        ELSE 'DEGRADED'
+    END as status
+FROM system.replicas 
+WHERE database = 'default'
+ORDER BY table;
+
+-- Check data consistency across all core tables
+SELECT 
+    'traces' as table, 
+    count() as row_count 
+FROM traces
+UNION ALL
+SELECT 'observations', count() FROM observations
+UNION ALL  
+SELECT 'scores', count() FROM scores
+UNION ALL
+SELECT 'blob_storage_file_log', count() FROM blob_storage_file_log
+UNION ALL
+SELECT 'project_environments', count() FROM project_environments
+UNION ALL
+SELECT 'schema_migrations', count() FROM schema_migrations;
+```
+
+**Table Creation Reference**:
+
+When recreating tables, use the correct engine parameters:
+
+```sql
+-- Example: ReplicatedReplacingMergeTree engine
+ENGINE = ReplicatedReplacingMergeTree(
+    '/clickhouse/tables/{uuid}/shard0',  -- ZooKeeper path (must be identical)
+    '{replica}',                         -- Replica name (unique per replica)
+    event_ts,                           -- Version column for deduplication
+    is_deleted                          -- Deletion flag column
+)
 ```
 
 **Automated Monitoring**:
@@ -526,10 +903,11 @@ helm get values langfuse -n langfuse
 
 ## Related Documentation
 
-For broader deployment issues, see:
+For understanding and broader deployment issues, see:
 
-- **[Deployment Troubleshooting](deployment-troubleshooting.qmd)** - General Azure deployment issues
+- **[ClickHouse Replication Architecture](../explanation/clickhouse-replication-architecture.qmd)** - Deep dive into replication mechanics, table relationships, and UI dependencies
 - **[Database Architecture](../explanation/database-architecture.qmd)** - Understanding the dual database system
+- **[Deployment Troubleshooting](deployment-troubleshooting.qmd)** - General Azure deployment issues
 - **[Data Lifecycle Management](data-lifecycle-management.qmd)** - TTL rules for automatic data retention and cleanup
 - **[Azure Architecture](../explanation/azure-architecture.qmd)** - Overall infrastructure components
 

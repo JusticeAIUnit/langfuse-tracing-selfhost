@@ -20,6 +20,8 @@ website:
             file: explanation/azure-architecture.qmd
           - text: "Database Architecture"
             file: explanation/database-architecture.qmd
+          - text: "ClickHouse Replication Architecture"
+            file: explanation/clickhouse-replication-architecture.qmd
           - text: "Observability Hierarchy"
             file: explanation/observability-hierarchy.qmd
       - text: "Learning"
