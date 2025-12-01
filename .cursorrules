@@ -1,0 +1,40 @@
+# LangFuse Documentation - Diátaxis Framework Guide
+
+This documentation follows the [Diátaxis framework](https://diataxis.fr/) with four distinct content types. **Always place new content in the correct directory based on its purpose:**
+
+## 📚 **explanation/** - Understanding-oriented
+**Purpose:** Context, background knowledge, and conceptual understanding
+**User need:** "I want to understand WHY and HOW this works"
+**Content:** Architecture overviews, design decisions, theoretical background
+**Examples:** `azure-architecture.qmd`, `database-architecture.qmd`, `observability-hierarchy.qmd`
+
+## 🎓 **tutorials/** - Learning-oriented  
+**Purpose:** Step-by-step lessons that teach through doing
+**User need:** "I want to learn by building something complete"
+**Content:** End-to-end walkthroughs, complete examples, skill-building exercises
+**Examples:** `quickstart.qmd`, `basic.qmd`
+
+## 🛠️ **how-to/** - Problem-oriented
+**Purpose:** Practical solutions for specific tasks and challenges
+**User need:** "I have a specific problem to solve right now"
+**Content:** Recipes, troubleshooting guides, configuration steps
+**Examples:** `python-sdk.qmd`, `azure-deployment.qmd`, `ssl-certificates.qmd`
+
+## 📋 **reference/** - Information-oriented
+**Purpose:** Technical specifications, API docs, comprehensive details
+**User need:** "I need to look up specific information"
+**Content:** API references, configuration options, command lists
+**Note:** Directory not yet created - add when needed
+
+## Content Placement Rules:
+- **Teaching concepts?** → `explanation/`
+- **Complete learning journey?** → `tutorials/`  
+- **Solving specific problems?** → `how-to/`
+- **Looking up facts/specs?** → `reference/`
+
+## File Naming:
+- Use kebab-case: `my-topic-name.qmd`
+- Be descriptive and specific
+- Group related content with prefixes when helpful
+
+When adding new content, ask: "What is the user trying to accomplish?" Then place accordingly.
