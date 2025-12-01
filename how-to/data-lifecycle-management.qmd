@@ -109,7 +109,56 @@ MODIFY TTL
 **Irreversible Operation**: TTL rules will permanently delete data. Ensure you have backups if you need to retain historical data for compliance or analysis purposes.
 :::
 
-### Step 4: Force Immediate Cleanup (Optional)
+### Step 4: Multi-Shard Deployment Considerations
+
+::: {.callout-warning}
+**Critical for Replicated Environments**: In multi-shard ClickHouse deployments, TTL changes must be applied to **ALL shards** to ensure consistency.
+:::
+
+**Single Shard Application:**
+```sql
+-- Connect to one shard
+kubectl exec -it langfuse-clickhouse-shard0-0 -n langfuse -- clickhouse-client
+ALTER TABLE traces MODIFY TTL toDateTime(timestamp) + INTERVAL 30 DAY DELETE WHERE project_id = 'YOUR_PROJECT_ID';
+```
+
+**Multi-Shard Application (Recommended):**
+```bash
+# Apply to all shards in your deployment
+for pod in langfuse-clickhouse-shard0-0 langfuse-clickhouse-shard0-1 langfuse-clickhouse-shard0-2; do
+  kubectl exec "$pod" -n langfuse -- clickhouse-client \
+    --password="$CH_PASSWORD" -q "
+    ALTER TABLE traces MODIFY TTL 
+        toDateTime(timestamp) + INTERVAL 30 DAY 
+        DELETE WHERE project_id = 'YOUR_PROJECT_ID';"
+done
+```
+
+### Step 5: Verify TTL Configuration
+
+**Check Current TTL Rules:**
+```sql
+-- View complete table structure including TTL
+SHOW CREATE TABLE table_name;
+
+-- Query system tables for TTL information
+SELECT table, ttl_expression 
+FROM system.tables 
+WHERE database = 'default' AND table IN ('traces', 'observations', 'scores');
+```
+
+**Multi-Shard Verification Script:**
+```bash
+#!/bin/bash
+echo "Verifying TTL configuration across all shards..."
+for pod in langfuse-clickhouse-shard0-0 langfuse-clickhouse-shard0-1 langfuse-clickhouse-shard0-2; do
+  echo "--- Checking $pod ---"
+  kubectl exec "$pod" -n langfuse -- clickhouse-client \
+    --password="$CH_PASSWORD" -q "SHOW CREATE TABLE traces" | grep "TTL" || echo "No TTL found"
+done
+```
+
+### Step 6: Force Immediate Cleanup (Optional)
 
 If you want to immediately remove old data rather than waiting for background merges:
 
@@ -174,6 +223,32 @@ MODIFY TTL
     DELETE WHERE project_id = 'YOUR_PROJECT_ID';
 ```
 
+### Selective TTL Removal
+
+Sometimes you need to remove TTL rules entirely for specific tables while maintaining them for others. This is useful when certain data needs indefinite retention for compliance or analysis purposes.
+
+**Remove TTL Completely:**
+```sql
+ALTER TABLE scores REMOVE TTL;
+```
+
+**Example - Mixed Retention Policy:**
+```sql
+-- Keep traces and observations with 3-day TTL for data quality
+ALTER TABLE traces 
+MODIFY TTL 
+    toDateTime(timestamp) + INTERVAL 3 DAY 
+    DELETE WHERE project_id = 'YOUR_PROJECT_ID';
+
+ALTER TABLE observations 
+MODIFY TTL 
+    toDateTime(start_time) + INTERVAL 3 DAY 
+    DELETE WHERE project_id = 'YOUR_PROJECT_ID';
+
+-- Remove TTL from scores for indefinite retention
+ALTER TABLE scores REMOVE TTL;
+```
+
 ## UI Verification
 
 Verify the effects in the LangFuse web interface:
@@ -218,6 +293,64 @@ WHERE database = 'default' AND table IN ('traces', 'observations', 'scores');
 - **Gradual Cleanup** - Use shorter retention periods initially, then extend
 - **Monitor Resources** - Watch CPU and I/O during cleanup operations
 
+### TTL Removal Issues
+
+**Problem**: Need to completely remove TTL rules from a table
+
+**Solution**:
+```sql
+ALTER TABLE scores REMOVE TTL;
+```
+
+**Verification**:
+```bash
+# Verify TTL removal across all shards
+for pod in langfuse-clickhouse-shard0-0 langfuse-clickhouse-shard0-1 langfuse-clickhouse-shard0-2; do
+  echo "--- Checking $pod ---"
+  kubectl exec "$pod" -n langfuse -- clickhouse-client \
+    -q "SHOW CREATE TABLE scores" | grep "TTL" || echo "No TTL found"
+done
+```
+
+### Multi-Shard Inconsistency
+
+**Problem**: TTL rules applied to only one shard, causing data inconsistency
+
+**Symptoms**:
+- Inconsistent data counts between UI refreshes
+- Some data appears and disappears randomly
+- Query results vary depending on which shard responds
+
+**Solution**:
+```bash
+# Always apply TTL changes to ALL shards
+for pod in langfuse-clickhouse-shard0-0 langfuse-clickhouse-shard0-1 langfuse-clickhouse-shard0-2; do
+  kubectl exec "$pod" -n langfuse -- clickhouse-client \
+    --password="$CH_PASSWORD" -q "ALTER TABLE table_name REMOVE TTL;"
+done
+```
+
+### Data Retention Monitoring
+
+**Problem**: TTL rules not working as expected or data growing unexpectedly
+
+**Diagnostic Queries**:
+```sql
+-- Check data retention for tables WITH TTL (should return 0 for old data)
+SELECT count() FROM traces 
+WHERE timestamp < now() - INTERVAL 35 DAY  -- 5 days past 30-day TTL
+  AND project_id = 'YOUR_PROJECT_ID';
+
+-- Monitor growth for tables WITHOUT TTL
+SELECT 
+    project_id,
+    count() as total_records,
+    min(timestamp) as oldest_record,
+    max(timestamp) as newest_record
+FROM scores 
+GROUP BY project_id;
+```
+
 ### Accidental Data Loss
 
 **Problem**: TTL rules deleted data that should have been retained
@@ -227,12 +360,13 @@ WHERE database = 'default' AND table IN ('traces', 'observations', 'scores');
 - **Test First** - Apply TTL rules to development projects before production
 - **Backup Strategy** - Ensure backups exist before implementing TTL
 - **Gradual Rollout** - Start with short retention periods and extend as needed
+- **Multi-Shard Verification** - Always verify TTL configuration across all shards
 
 **Recovery** (if backups exist):
 
 ```sql
--- Remove TTL rule
-ALTER TABLE traces MODIFY TTL;
+-- Remove TTL rule (use correct syntax)
+ALTER TABLE traces REMOVE TTL;
 
 -- Restore from backup (implementation depends on backup strategy)
 ```
@@ -245,6 +379,8 @@ ALTER TABLE traces MODIFY TTL;
 2. **Test Thoroughly** - Implement on development projects first
 3. **Document Decisions** - Record retention periods and business justifications
 4. **Monitor Impact** - Track storage usage and query performance improvements
+5. **Multi-Shard Awareness** - Always consider multi-shard deployments in TTL planning
+6. **Syntax Verification** - Use `REMOVE TTL` for complete removal, `MODIFY TTL` for changes
 
 ### Operational Management
 
@@ -252,6 +388,8 @@ ALTER TABLE traces MODIFY TTL;
 2. **Automated Monitoring** - Set up alerts for TTL rule failures or unexpected data volumes
 3. **Backup Coordination** - Ensure backup strategies account for TTL policies
 4. **Compliance Alignment** - Verify TTL periods meet regulatory requirements
+5. **Multi-Shard Consistency** - Regularly verify TTL configuration across all shards
+6. **Mixed Policy Management** - Monitor storage growth for tables with removed TTL
 
 ### Performance Optimization
 
@@ -259,6 +397,71 @@ ALTER TABLE traces MODIFY TTL;
 2. **Off-Peak Scheduling** - Run manual cleanup operations during low-usage periods
 3. **Resource Monitoring** - Watch for resource contention during cleanup operations
 4. **Incremental Approach** - Implement TTL gradually across projects
+
+## Operational Impact Considerations
+
+### Storage Management
+
+When implementing mixed TTL policies (some tables with TTL, others without):
+
+**Tables WITH TTL**:
+
+- Automatic storage cleanup
+- Predictable storage growth patterns
+- Consistent query performance
+
+**Tables WITHOUT TTL** (indefinite retention):
+
+- Continuous storage growth - monitor disk usage
+- Potential query performance degradation over time
+- Increased backup storage requirements
+
+**Monitoring Strategy**:
+```sql
+-- Monitor storage growth for tables without TTL
+SELECT 
+    table,
+    formatReadableSize(total_bytes) as size,
+    rows,
+    formatDateTime(max_date, '%Y-%m-%d') as latest_data
+FROM system.parts 
+WHERE database = 'default' 
+  AND table IN ('scores')  -- Tables without TTL
+GROUP BY table;
+```
+
+### Performance Considerations
+
+**Query Performance Monitoring**:
+```sql
+-- Monitor query performance on growing tables
+SELECT 
+    query_duration_ms,
+    read_rows,
+    read_bytes,
+    query
+FROM system.query_log 
+WHERE query LIKE '%scores%'  -- Table without TTL
+  AND type = 'QueryFinish'
+ORDER BY event_time DESC 
+LIMIT 10;
+```
+
+**Optimization Strategies for Indefinite Retention**:
+
+- Implement date-based partitioning for easier management
+- Consider archival strategies for very old data
+- Monitor and optimize indexes as tables grow
+- Plan for storage tier management (hot/warm/cold storage)
+
+### Compliance and Risk Management
+
+**Benefits of Mixed Policies**:
+
+- ✅ **Compliance**: Critical data (scores) retained indefinitely for analysis
+- ✅ **Data Quality**: Trace TTL prevents UI corruption from stale data
+- ✅ **Storage Optimization**: Operational data still cleaned up automatically
+- ✅ **Risk Mitigation**: Balanced approach to data retention
 
 ## Integration with Other Processes
 
