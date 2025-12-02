@@ -23,12 +23,119 @@ categories: ["Infrastructure & Deployment", "Troubleshooting", "Database"]
 
 ## Prerequisites
 
-Before troubleshooting ClickHouse issues, ensure you understand the replication architecture. See the [ClickHouse Replication Architecture](../explanation/clickhouse-replication-architecture.qmd) guide for comprehensive details on:
+Before troubleshooting ClickHouse issues, ensure you understand the replication architecture. See the [ClickHouse Replication Architecture](../explanation/clickhouse-replication-architecture.qmd) guide for comprehensive details on: 
 
 - Complete table inventory and UI dependencies
 - ZooKeeper coordination mechanics  
 - Replication process and failure scenarios
 - Production architecture considerations
+
+## ClickHouse Migration System Issues
+
+### Migration System Failures
+
+**Error Pattern**: `error: Dirty database version X. Fix and force version.`
+
+**Symptoms**: 
+
+- `langfuse-web` pods in `CrashLoopBackOff` state
+- Service completely unavailable
+- Migration system reports "dirty" database state
+
+**Root Cause**: ClickHouse cluster migration state inconsistency across shards, often combined with incorrect Helm configuration preventing environment variables from being applied.
+
+#### Diagnostic Steps
+
+**Step 1: Check Pod Status and Logs**
+```bash
+# Check pod status
+kubectl get pods -n langfuse
+
+# Check web pod logs for migration errors
+kubectl logs -n langfuse deployment/langfuse-web --tail=50 | grep -i "migration\|dirty\|version"
+```
+
+**Step 2: Inspect ClickHouse Migration State**
+```bash
+# Connect to ClickHouse and check migration state across all shards
+kubectl exec -n langfuse langfuse-clickhouse-shard0-0 -- clickhouse-client -q "
+SELECT hostName(), version, dirty, sequence 
+FROM schema_migrations 
+ORDER BY sequence;"
+```
+
+**Expected Problem Pattern**:
+```
+Shard 0-0: version=1, dirty=1 (dirty state)
+Shard 0-1: version=1, dirty=1 (dirty state)  
+Shard 0-2: version=1, dirty=1 (dirty state)
+```
+
+**Step 3: Verify Environment Variables**
+```bash
+# Check if migration disable flag is actually applied
+kubectl exec -n langfuse deployment/langfuse-web -- env | grep LANGFUSE_AUTO_CLICKHOUSE_MIGRATION_DISABLED
+
+# If empty or "false", environment variables aren't being applied correctly
+```
+
+#### Resolution: Cluster State Synchronization
+
+**Fix Migration State Across All Shards**:
+```bash
+# Connect to each ClickHouse shard and synchronize state
+for shard in 0 1 2; do
+  echo "Fixing shard $shard..."
+  kubectl exec -n langfuse langfuse-clickhouse-shard0-$shard -- clickhouse-client -q "
+    -- Clear dirty flags
+    ALTER TABLE schema_migrations UPDATE dirty = 0 WHERE version = 1;
+    
+    -- Remove invalid version numbers (if any exist)
+    DELETE FROM schema_migrations WHERE version > 100;
+    
+    -- Ensure clean state
+    INSERT INTO schema_migrations (version, dirty, sequence) VALUES (1, 0, 1) 
+    ON DUPLICATE KEY UPDATE dirty = 0;
+  "
+done
+```
+
+**Verify Synchronization**:
+```bash
+# All shards should show identical, clean state
+kubectl exec -n langfuse langfuse-clickhouse-shard0-0 -- clickhouse-client -q "
+SELECT hostName(), version, dirty, sequence 
+FROM schema_migrations 
+ORDER BY sequence;"
+```
+
+#### Prevention and Monitoring
+
+**Regular Cluster State Verification**:
+```bash
+# Add to monitoring scripts
+kubectl exec -n langfuse langfuse-clickhouse-shard0-0 -- clickhouse-client -q "
+SELECT 
+  hostName(),
+  version,
+  dirty,
+  CASE WHEN dirty = 1 THEN '⚠️ DIRTY' ELSE '✅ CLEAN' END as status
+FROM schema_migrations 
+ORDER BY sequence;"
+```
+
+**Migration Disable Configuration**:
+
+If you need to disable auto-migrations (recommended for production), ensure the environment variable is properly configured:
+
+```bash
+# Verify migration disable is working
+kubectl exec -n langfuse deployment/langfuse-web -- env | grep LANGFUSE_AUTO_CLICKHOUSE_MIGRATION_DISABLED
+
+# Should show: LANGFUSE_AUTO_CLICKHOUSE_MIGRATION_DISABLED=true
+```
+
+For Helm configuration issues with environment variables, see the [Email Notifications Guide](email-notifications.qmd#helm-configuration-issues-with-smtp) which covers the `additionalEnv` vs `extraEnv` configuration path issue.
 
 ## ClickHouse Replication Synchronization Issues
 

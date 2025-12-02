@@ -457,6 +457,136 @@ When rotating Azure AD app registration secrets:
 - [ ] Verify MailFrom address is configured in ACS
 - [ ] Check app registration permissions on Communication Services
 
+## Helm Configuration Issues with SMTP
+
+### Environment Variables Not Applied After Helm Upgrades
+
+**Problem**: SMTP environment variables defined in Helm values files disappear from deployed pods after Helm operations, causing email functionality to fail silently.
+
+**Symptoms**:
+
+- SMTP configuration missing from pods after Helm upgrade
+- Email notifications stop working without obvious errors
+- `kubectl exec` shows missing `SMTP_CONNECTION_URL` or `EMAIL_FROM_ADDRESS`
+- Features worked before Helm upgrade but fail afterward
+
+#### Root Cause: Incorrect Configuration Paths
+
+**Common Mistake**: Using `langfuse.extraEnv` instead of `langfuse.additionalEnv` in Helm values
+
+#### Diagnostic Steps
+
+**Step 1: Template Verification**
+```bash
+# Generate template to see what Helm actually renders
+helm template langfuse langfuse/langfuse -n langfuse \
+  -f values.yaml \
+  -f current-values.yaml > helm-template-output.yaml
+
+# Check if SMTP environment variables appear in the template
+grep -A 10 -B 5 "SMTP_CONNECTION_URL" helm-template-output.yaml
+```
+
+**Step 2: Compare Expected vs Actual**
+```bash
+# Check what environment variables are actually in the running pod
+kubectl exec -n langfuse deployment/langfuse-web -- env | grep -E "(SMTP|EMAIL)" | sort
+
+# Should show:
+# EMAIL_FROM_ADDRESS=your-email@domain.com
+# SMTP_CONNECTION_URL=smtp://resource.appId.tenantId:secret@smtp.azurecomm.net:587/...
+```
+
+#### Resolution: Correct Configuration Path
+
+**Wrong Configuration** (`values.yaml`):
+```yaml
+langfuse:
+  extraEnv:  # ❌ Not rendered in template
+  - name: SMTP_CONNECTION_URL
+    value: "smtp://langfuse-ai-smtp.app-id.tenant-id:client-secret@smtp.azurecomm.net:587/?pool=true&secure=false&requireTLS=true"
+  - name: EMAIL_FROM_ADDRESS
+    value: "DoNotReply@yourdomain.com"
+```
+
+**Correct Configuration** (`values.yaml`):
+```yaml
+langfuse:
+  additionalEnv:  # ✅ Properly rendered
+  - name: SMTP_CONNECTION_URL
+    value: "smtp://langfuse-ai-smtp.app-id.tenant-id:client-secret@smtp.azurecomm.net:587/?pool=true&secure=false&requireTLS=true"
+  - name: EMAIL_FROM_ADDRESS
+    value: "DoNotReply@yourdomain.com"
+```
+
+#### Deployment with Configuration Fix
+
+**Step 1: Verify Template Renders Correctly**
+```bash
+# Always verify before deploying
+helm template langfuse langfuse/langfuse -n langfuse \
+  -f values.yaml \
+  -f current-values.yaml | grep -A 5 -B 5 "SMTP_CONNECTION_URL"
+```
+
+**Step 2: Deploy with Force (if needed)**
+```bash
+# Use --force if environment variable structure changed significantly
+helm upgrade langfuse langfuse/langfuse -n langfuse \
+  -f values.yaml \
+  -f current-values.yaml \
+  --force
+```
+
+**Step 3: Verify Application**
+```bash
+# Wait for pods to restart
+kubectl rollout status deployment/langfuse-web -n langfuse --timeout=300s
+
+# Verify SMTP environment variables are now present
+kubectl exec -n langfuse deployment/langfuse-web -- env | grep -E "(SMTP|EMAIL)"
+```
+
+#### Troubleshooting Tips
+
+**Template-First Debugging**:
+
+- Always use `helm template` to verify configuration before deployment
+- Template inspection reveals configuration issues faster than pod debugging
+- Look for missing environment variables in the rendered manifests
+
+**Environment Variable Precedence**:
+
+- Later entries in the env list take precedence over earlier ones
+- Warnings about "hides previous definition" are expected and acceptable
+- Use `--force` when environment variable structure changes significantly
+
+**Configuration Validation Script**:
+```bash
+#!/bin/bash
+# Save as: validate-smtp-helm-config.sh
+
+echo "=== Validating SMTP Helm Configuration ==="
+
+# Generate template
+helm template langfuse langfuse/langfuse -n langfuse \
+  -f values.yaml \
+  -f current-values.yaml > /tmp/helm-template.yaml
+
+# Check for required SMTP environment variables
+REQUIRED_VARS=("SMTP_CONNECTION_URL" "EMAIL_FROM_ADDRESS")
+
+for var in "${REQUIRED_VARS[@]}"; do
+  if grep -q "$var" /tmp/helm-template.yaml; then
+    echo "✅ $var found in template"
+  else
+    echo "❌ $var missing from template - check additionalEnv configuration"
+  fi
+done
+
+echo "=== SMTP template validation complete ==="
+```
+
 ## Maintenance Notes
 
 ::: {.callout-warning}

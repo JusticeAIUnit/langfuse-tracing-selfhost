@@ -588,14 +588,17 @@ terraform apply -auto-approve
 | `InvalidResourceReference.*redirectConfigurations` | AGIC configuration conflict | Run `terraform refresh`, then apply |
 | **502 Bad Gateway** | Multiple possible causes | Use diagnostic tree to identify specific type (see 502 Error Types Summary) |
 | **"Your connection is not private"** | Wrong SSL certificate being used | Switch to Let's Encrypt certificate (see SSL Certificate Issues) |
-| **Gateway shows "Unhealthy"** | Server IP mismatch or server not responding | Type B: Backend IP Mismatch (see above) |
-| **Permission errors in logs** | Gateway controller can't update settings | Type D: AGIC Permission Issue (see above) |
+| **Gateway shows "Unhealthy"** | Server IP mismatch or server not responding | Type B: Backend IP Mismatch (see Application Gateway Issues section above) |
+| **Permission errors in logs** | Gateway controller can't update settings | Type D: AGIC Permission Issue (see Application Gateway Issues section above) |
 | **535 5.7.3 Authentication unsuccessful** | SMTP client secret mismatch | Update SMTP_CONNECTION_URL with correct client secret (see [Email Notifications Guide](email-notifications.qmd)) |
 | **Emails not delivered but no UI errors** | SMTP authentication failing silently | Check LangFuse logs for SMTP errors (see [Email Notifications Guide](email-notifications.qmd)) |
 | **"Same provider" SSO error** | Existing password-based user blocks SSO | Delete user record to allow fresh SSO setup (see [User Management Guide](user-management.qmd)) |
 | **Inconsistent UI data on refresh** | ClickHouse replica UUID mismatch | See [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd) |
 | **ImagePullBackOff with bitnami images** | Bitnami registry migration (Aug 2025) | Use bitnamilegacy registry (see [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd)) |
 | **ZooKeeper OOM errors** | Memory exhaustion in coordination layer | Increase ZooKeeper memory limits (see [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd)) |
+| **"Dirty database version X"** | ClickHouse migration state inconsistency | Synchronize migration state across all shards (see [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd)) |
+| **Environment variables missing from pods** | Incorrect Helm configuration path | Use `langfuse.additionalEnv` instead of `langfuse.extraEnv` (see [Email Notifications Guide](email-notifications.qmd)) |
+| **CrashLoopBackOff with migration errors** | Combined ClickHouse + Helm config issues | Fix migration state AND correct Helm paths (see [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd) and [Email Notifications Guide](email-notifications.qmd)) |
 
 ## Comprehensive Troubleshooting Reference
 
@@ -657,7 +660,6 @@ echo "=== Pod Status ===" && kubectl get pods -n langfuse && \
 echo "=== Gateway Health ===" && az network application-gateway show-backend-health --resource-group <YOUR_RESOURCE_GROUP> --name <YOUR_APP_GATEWAY> | jq '.backendAddressPools[0].backendHttpSettingsCollection[0].servers[0].health' && \
 echo "=== Website Response ===" && curl -k -s -o /dev/null -w "%{http_code}" https://<YOUR_DOMAIN>
 ```
-
 
 ## Best Practices for Troubleshooting
 
