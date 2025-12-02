@@ -31,6 +31,41 @@ categories: ["User Management", "Authentication", "Troubleshooting"]
 
 **Root Cause**: Certain database records link the user's email to an existing password-based account, preventing fresh SSO account creation.
 
+### Common Scenarios That Lead to This Error
+
+Understanding when you'll encounter the "same provider" error helps with faster diagnosis:
+
+#### Scenario 1: Initial Password-Based Setup
+
+**What happened**: You initially set up LangFuse without SSO configuration, so the first admin user was created with email/password authentication.
+
+**When you see the error**: Later, when you configure Azure AD SSO and try to log in with the same email address through Azure AD.
+
+**Why it happens**: The database has a user record with a `password` field, which LangFuse interprets as "this user uses password authentication, not SSO."
+
+#### Scenario 2: Entra App Credential Cycling
+
+**What happened**: You have working Azure AD SSO, but you rotated/regenerated the client secret or certificate for your Entra app registration (for security compliance or because credentials expired).
+
+**When you see the error**: After updating the new credentials in your LangFuse configuration, existing SSO users suddenly can't log in and see the "same provider" error.
+
+**Why it happens**: The credential change can sometimes cause the SSO authentication to fail in a way that makes LangFuse think the user should be using a different authentication method.
+
+::: {.callout-tip}
+**Quick Identification**: If you're unsure which scenario applies, check the user's account creation method:
+```bash
+# Check how a user was created
+kubectl run check-auth-method --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
+PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h $(kubectl get service langfuse-postgresql -n langfuse -o jsonpath='{.spec.clusterIP}') -U postgres -d langfuse -c \"
+SELECT 
+  email,
+  CASE WHEN password IS NOT NULL THEN 'Password-based' ELSE 'SSO-ready' END as current_auth,
+  created_at
+FROM users WHERE email = 'user@example.com';\"
+"
+```
+:::
+
 ## Database Schema: Tables That Block SSO Onboarding
 
 ```{mermaid}
