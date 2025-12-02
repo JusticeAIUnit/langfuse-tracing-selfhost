@@ -484,137 +484,6 @@ openssl s_client -connect <YOUR_DOMAIN>:443 -servername <YOUR_DOMAIN>
 openssl s_client -connect <YOUR_DOMAIN>:443 -servername <YOUR_DOMAIN> </dev/null 2>/dev/null | openssl x509 -noout -text | grep -A 1 "Issuer:"
 ```
 
-## SMTP Email Delivery Issues
-
-### Problem Symptom
-
-**Issue**: Emails appear to send successfully from LangFuse UI (user invitations, password resets) but recipients never receive them.
-
-- ✅ No error shown in LangFuse interface
-- ✅ "Invitation sent" message appears
-- ❌ Email never arrives in recipient's inbox (including spam folder)
-
-### Root Cause Investigation
-
-**Step 1: Check LangFuse Web Logs**
-
-The real issue will be visible in the application logs:
-
-```bash
-# Check recent logs for SMTP authentication errors
-kubectl logs -n langfuse deployment/langfuse-web --tail=100 --since=30m | grep -E "(535|SMTP|authentication|mail)"
-```
-
-**Expected Error Pattern:**
-```
-Error Invalid login: 535 5.7.3 Authentication unsuccessful
-```
-
-**Step 2: Verify Current SMTP Configuration**
-
-Check what SMTP credentials are actually being used:
-
-```bash
-# Get current SMTP configuration from running pod
-kubectl exec -n langfuse deployment/langfuse-web -- printenv SMTP_CONNECTION_URL
-
-# Expected format: smtp://resource.appId.tenantId:clientSecret@smtp.azurecomm.net:587/...
-```
-
-### Fix: Credential Mismatch Resolution
-
-**Problem**: Wrong Client Secret
-
-The most common cause is using an **expired or incorrect client secret** in the SMTP connection string.
-
-**Solution Steps:**
-
-**1. Get Current App Registration Client Secret**
-- Go to Azure Portal → App Registrations 
-- Find your SMTP app (e.g., `langfuse-smtp-app`)
-- Go to "Certificates & secrets"
-- Note the current valid client secret value
-
-**2. Check App Registration ID**
-```bash
-# Verify the app registration exists and get its details
-kubectl exec -n langfuse deployment/langfuse-web -- printenv SMTP_CONNECTION_URL | sed 's/.*:\/\/[^.]*\.\([^.]*\)\..*/App ID: \1/'
-
-# Cross-reference with Azure Portal app registration
-```
-
-**3. Update SMTP Configuration with Correct Secret**
-```bash
-# Replace with actual values from your Azure Portal
-kubectl set env deployment/langfuse-web -n langfuse \
-SMTP_CONNECTION_URL="smtp://langfuse-ai-smtp.YOUR_APP_ID.YOUR_TENANT_ID:YOUR_CORRECT_CLIENT_SECRET@smtp.azurecomm.net:587/?pool=true&secure=false&requireTLS=true"
-```
-
-**4. Wait for Pod Restart**
-```bash
-kubectl rollout status deployment/langfuse-web -n langfuse --timeout=120s
-```
-
-### Required SMTP Configuration Format
-
-For Azure Communication Services SMTP authentication:
-
-```
-Username: <ACS_resource_name>.<Entra_app_client_ID>.<Tenant_ID>
-Password: <Entra_app_client_secret>
-Server: smtp.azurecomm.net
-Port: 587 (STARTTLS)
-```
-
-**Critical Points:**
-
-- Use **dots** (`.`) as separators in username, not pipes (`|`)
-- Password must be the current **Entra app client secret**, not ACS access key
-- Client secret must be from the same app registration used in the username
-
-### Testing and Verification
-
-**Verify SMTP Fix**
-
-After updating credentials:
-
-```bash
-# Check for new authentication errors (should be none)
-kubectl logs -n langfuse deployment/langfuse-web --since=5m | grep -E "(535|authentication)" || echo "No SMTP errors found"
-
-# Test email from LangFuse UI
-# Send user invitation and check logs for success
-```
-
-### Configuration Maintenance
-
-**After Helm Upgrades**
-
-Environment variables set with `kubectl set env` may be overwritten by Helm. After Helm operations, re-verify:
-
-```bash
-# Check if SMTP config is still correct
-kubectl exec -n langfuse deployment/langfuse-web -- printenv SMTP_CONNECTION_URL
-
-# If reverted, reapply the correct configuration
-```
-
-**Client Secret Rotation**
-
-When rotating Azure AD app registration secrets:
-
-1. Generate new client secret in Azure Portal
-2. Update SMTP_CONNECTION_URL with new secret using `kubectl set env`
-3. Ensure old secret is deleted only after confirming new one works
-
-### Quick Diagnostic Checklist
-
-- [ ] Check LangFuse logs for `535 5.7.3 Authentication unsuccessful`
-- [ ] Verify SMTP username uses dot-separated format
-- [ ] Confirm client secret matches current Azure Portal value
-- [ ] Test ACS direct email sending works
-- [ ] Verify MailFrom address is configured in ACS
-- [ ] Check app registration permissions on Communication Services
 
 ## AKS and Kubernetes Issues
 
@@ -721,8 +590,8 @@ terraform apply -auto-approve
 | **"Your connection is not private"** | Wrong SSL certificate being used | Switch to Let's Encrypt certificate (see SSL Certificate Issues) |
 | **Gateway shows "Unhealthy"** | Server IP mismatch or server not responding | Type B: Backend IP Mismatch (see above) |
 | **Permission errors in logs** | Gateway controller can't update settings | Type D: AGIC Permission Issue (see above) |
-| **535 5.7.3 Authentication unsuccessful** | SMTP client secret mismatch | Update SMTP_CONNECTION_URL with correct client secret (see SMTP Email Delivery Issues) |
-| **Emails not delivered but no UI errors** | SMTP authentication failing silently | Check LangFuse logs for SMTP errors (see SMTP Email Delivery Issues) |
+| **535 5.7.3 Authentication unsuccessful** | SMTP client secret mismatch | Update SMTP_CONNECTION_URL with correct client secret (see [Email Notifications Guide](email-notifications.qmd)) |
+| **Emails not delivered but no UI errors** | SMTP authentication failing silently | Check LangFuse logs for SMTP errors (see [Email Notifications Guide](email-notifications.qmd)) |
 | **"Same provider" SSO error** | Existing password-based user blocks SSO | Delete user record to allow fresh SSO setup (see [User Management Guide](user-management.qmd)) |
 | **Inconsistent UI data on refresh** | ClickHouse replica UUID mismatch | See [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd) |
 | **ImagePullBackOff with bitnami images** | Bitnami registry migration (Aug 2025) | Use bitnamilegacy registry (see [ClickHouse Troubleshooting Guide](clickhouse-troubleshooting.qmd)) |
@@ -748,6 +617,7 @@ kubectl logs -n kube-system deployment/ingress-appgw-deployment | grep -i "autho
 openssl s_client -connect <YOUR_DOMAIN>:443 -servername <YOUR_DOMAIN> </dev/null 2>/dev/null | openssl x509 -noout -text | grep -A 1 "Issuer:"
 
 # 5. Are emails failing to send (SMTP issues)?
+# See Email Notifications Guide for detailed SMTP troubleshooting
 kubectl logs -n langfuse deployment/langfuse-web --tail=100 --since=30m | grep -E "(535|SMTP|authentication|mail)"
 ```
 
