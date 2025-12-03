@@ -23,7 +23,7 @@ categories: ["Infrastructure & Deployment", "Troubleshooting", "Database"]
 
 ## Prerequisites
 
-Before troubleshooting ClickHouse issues, ensure you understand the replication architecture. See the [ClickHouse Replication Architecture](../explanation/clickhouse-replication-architecture.qmd) guide for comprehensive details on: 
+Before troubleshooting ClickHouse issues, ensure you understand the replication architecture. See the [ClickHouse Replication Architecture](../explanation/clickhouse-replication-architecture.qmd) guide for comprehensive details on:
 
 - Complete table inventory and UI dependencies
 - ZooKeeper coordination mechanics  

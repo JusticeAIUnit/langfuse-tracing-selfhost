@@ -43,20 +43,45 @@ Understanding when you'll encounter the "same provider" error helps with faster 
 
 **Why it happens**: The database has a user record with a `password` field, which LangFuse interprets as "this user uses password authentication, not SSO."
 
-#### Scenario 2: Entra App Credential Cycling
+---
 
-**What happened**: You have working Azure AD SSO, but you rotated/regenerated the client secret or certificate for your Entra app registration (for security compliance or because credentials expired).
+#### Scenario 2: Entra App Credential Cycling or Migration
+
+**What happened**: You have working Azure AD SSO, but either:
+
+- You rotated/regenerated the client secret or certificate for your Entra app registration (for security compliance or because credentials expired)
+- You migrated to a new Entra app registration (different Application ID)
 
 **When you see the error**: After updating the new credentials in your LangFuse configuration, existing SSO users suddenly can't log in and see the "same provider" error.
 
-**Why it happens**: The credential change can sometimes cause the SSO authentication to fail in a way that makes LangFuse think the user should be using a different authentication method.
+**Why it happens**: The credential change can cause the SSO authentication to fail, or in the case of app migration, the `providerAccountId` in the database no longer matches the new Entra app.
+
+**Key Diagnostic**: Check the `Account` table for existing SSO records:
+
+```bash
+# Check if user has existing SSO account record
+PGPASSWORD=$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)
+DB_HOST=$(kubectl get service langfuse-postgresql -n langfuse -o jsonpath='{.spec.clusterIP}')
+
+kubectl run check-account --rm -i --tty --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"
+SELECT u.email, a.provider, a.\"providerAccountId\"
+FROM users u 
+JOIN \"Account\" a ON u.id = a.user_id 
+WHERE u.email = 'user@example.com';\"
+"
+```
+
+**If the user has an Account record but still gets "same provider" error**: The `providerAccountId` is likely from the old Entra app. **Solution**: Delete the user record (Account will cascade delete), then user can log in fresh with the new app.
+
+---
 
 ::: {.callout-tip}
 **Quick Identification**: If you're unsure which scenario applies, check the user's account creation method:
 ```bash
 # Check how a user was created
-kubectl run check-auth-method --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h $(kubectl get service langfuse-postgresql -n langfuse -o jsonpath='{.spec.clusterIP}') -U postgres -d langfuse -c \"
+kubectl run check-auth-method --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"
 SELECT 
   email,
   CASE WHEN password IS NOT NULL THEN 'Password-based' ELSE 'SSO-ready' END as current_auth,
@@ -66,7 +91,28 @@ FROM users WHERE email = 'user@example.com';\"
 ```
 :::
 
+---
+
+## Database Connection Methods
+
+```bash
+# Get credentials first, then use them
+PGPASSWORD=$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)
+DB_HOST=$(kubectl get service langfuse-postgresql -n langfuse -o jsonpath='{.spec.clusterIP}')
+
+# Then execute database commands
+kubectl run temp-db-pod --rm -i --tty --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c 'SELECT * FROM users;'
+"
+```
+
+---
+
 ## Database Schema: Tables That Block SSO Onboarding
+
+::: {.callout-warning}
+**Column Naming**: The `Account` table uses mixed naming conventions. Some columns use `snake_case` while others use `camelCase`. Always use quotes around camelCase column names in SQL queries.
+:::
 
 ```{mermaid}
 erDiagram
@@ -84,9 +130,9 @@ erDiagram
     }
     
     Account {
-        text user_id FK "Auto-cleaned"
-        text provider "Azure AD"
-        text provider_account_id
+        text user_id FK "snake_case"
+        text provider "camelCase table"
+        text providerAccountId "camelCase - needs quotes"
     }
     
     Session {
@@ -120,33 +166,33 @@ erDiagram
 
 **Solution**: Complete user deletion
 
+---
+
 ### User Deletion Procedure
 
 **Step 1: Get Database Connection Details**
 
 ```bash
-# Get database password
-kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d
+# Get database credentials and connection info
+PGPASSWORD=$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)
+DB_HOST=$(kubectl get service langfuse-postgresql -n langfuse -o jsonpath='{.spec.clusterIP}')
+
+echo "Database Host: $DB_HOST"
+echo "Password retrieved successfully"
 ```
 
 **Step 2: Delete User Record**
 
 ```bash
 # Replace 'user@example.com' with the actual email address
-kubectl run delete-user --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-apt-get update -qq && apt-get install -y postgresql-client -qq
+kubectl run delete-user --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
 echo 'Deleting user record...'
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"DELETE FROM users WHERE email = 'user@example.com';\"
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"DELETE FROM users WHERE email = 'user@example.com';\"
 echo 'User deletion completed!'
 "
 ```
 
-::: {.callout-important}
-**Database Host IP**: The IP address `10.224.0.65` in the example above should be replaced with your actual PostgreSQL service IP. You can find this with:
-```bash
-kubectl get service langfuse-postgresql -n langfuse -o jsonpath='{.spec.clusterIP}'
-```
-:::
+---
 
 ### `membership_invitations` Table - **POTENTIAL CONFLICT** 📧
 
@@ -163,13 +209,14 @@ kubectl get service langfuse-postgresql -n langfuse -o jsonpath='{.spec.clusterI
 
 ```bash
 # Replace 'user@example.com' with the actual email address
-kubectl run cleanup-invitations --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-apt-get update -qq && apt-get install -y postgresql-client -qq
+kubectl run cleanup-invitations --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
 echo 'Cleaning up old invitations...'
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"DELETE FROM membership_invitations WHERE email = 'user@example.com';\"
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"DELETE FROM membership_invitations WHERE email = 'user@example.com';\"
 echo 'Invitation cleanup completed!'
 "
 ```
+
+---
 
 ## Complete SSO Migration Procedure
 
@@ -179,9 +226,8 @@ echo 'Invitation cleanup completed!'
 
 ```bash
 # List all password-based users
-kubectl run list-users --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-apt-get update -qq && apt-get install -y postgresql-client -qq
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"SELECT email, admin, created_at FROM users WHERE password IS NOT NULL;\"
+kubectl run list-users --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"SELECT email, admin, created_at FROM users WHERE password IS NOT NULL;\"
 "
 ```
 
@@ -205,15 +251,16 @@ After user deletion:
 
 ```bash
 # Verify user now has SSO account
-kubectl run verify-sso --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-apt-get update -qq && apt-get install -y postgresql-client -qq
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"
-SELECT u.email, u.password IS NULL as sso_ready, a.provider 
+kubectl run verify-sso --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"
+SELECT u.email, u.password IS NULL as sso_ready, a.provider, a.\"providerAccountId\"
 FROM users u 
-LEFT JOIN Account a ON u.id = a.user_id 
+LEFT JOIN \"Account\" a ON u.id = a.user_id 
 WHERE u.email = 'user@example.com';\"
 "
 ```
+
+---
 
 ## Common User Management Tasks
 
@@ -221,45 +268,49 @@ WHERE u.email = 'user@example.com';\"
 
 ```bash
 # Check if user exists and authentication method
-kubectl run check-user --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-apt-get update -qq && apt-get install -y postgresql-client -qq
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"
+kubectl run check-user --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"
 SELECT 
   u.email,
   CASE WHEN u.password IS NOT NULL THEN 'Password' ELSE 'SSO' END as auth_method,
   u.admin,
   a.provider as sso_provider,
+  a.\"providerAccountId\",
   u.created_at
 FROM users u 
-LEFT JOIN Account a ON u.id = a.user_id 
+LEFT JOIN \"Account\" a ON u.id = a.user_id 
 WHERE u.email = 'user@example.com';\"
 "
 ```
+
+---
 
 ### List All Active Sessions
 
 ```bash
 # View active user sessions
-kubectl run list-sessions --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-apt-get update -qq && apt-get install -y postgresql-client -qq
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"
+kubectl run list-sessions --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"
 SELECT u.email, s.expires, s.session_token 
-FROM Session s 
+FROM \"Session\" s 
 JOIN users u ON s.user_id = u.id 
 WHERE s.expires > NOW() 
 ORDER BY s.expires DESC;\"
 "
 ```
 
+---
+
 ### Clean Up Expired Sessions
 
 ```bash
 # Remove expired sessions
-kubectl run cleanup-sessions --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-apt-get update -qq && apt-get install -y postgresql-client -qq
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"DELETE FROM Session WHERE expires < NOW();\"
+kubectl run cleanup-sessions --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"DELETE FROM \"Session\" WHERE expires < NOW();\"
 "
 ```
+
+---
 
 ## Troubleshooting User Issues
 
@@ -270,6 +321,8 @@ PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgr
 **Root Cause**: User was recreated with a new ID, breaking data relationships
 
 **Solution**: This is expected behavior. SSO migration creates a fresh account. Previous data is not automatically transferred.
+
+---
 
 ### Multiple Accounts for Same User
 
@@ -282,6 +335,8 @@ PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgr
 2. Delete the unwanted account using the procedures above
 3. Ensure only one account exists per email
 
+---
+
 ### Admin Privileges Lost After Migration
 
 **Problem**: User lost admin privileges after SSO migration
@@ -292,10 +347,30 @@ PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgr
 
 ```bash
 # Grant admin privileges to SSO user
-kubectl run grant-admin --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 --command -- sh -c "
-apt-get update -qq && apt-get install -y postgresql-client -qq
-PGPASSWORD='$(kubectl get secret langfuse -n langfuse -o jsonpath='{.data.postgres-password}' | base64 -d)' psql -h 10.224.0.65 -U postgres -d langfuse -c \"UPDATE users SET admin = true WHERE email = 'user@example.com';\"
+kubectl run grant-admin --rm --tty -i --restart='Never' --namespace langfuse --image postgres:15 -- sh -c "
+PGPASSWORD='$PGPASSWORD' psql -h $DB_HOST -U postgres -d langfuse -c \"UPDATE users SET admin = true WHERE email = 'user@example.com';\"
 "
 ```
 
+---
+
+### "OAuthCreateAccount Contact support" Error During Migration
+
+**Problem**: Users encounter "OAuthCreateAccount Contact support if this error is unexpected" when trying to log in after database cleanup
+
+**Root Cause**: `signUpDisabled: true` prevents automatic SSO account creation, even for users with valid invitations
+
+**Solution**: 
+1. **Temporary fix**: Set `signUpDisabled: false` during migration period
+2. **Alternative**: Ensure all users have valid pending invitations before database cleanup
+3. **Permanent fix**: Consider keeping `signUpDisabled: false` with domain enforcement for easier user management
+
+::: {.callout-tip}
+**Configuration Context**: For detailed explanation of `signUpDisabled` settings and their implications, see [SSO Configuration Decisions](../explanation/sso-configuration-decisions.qmd).
+:::
+
 **Key Takeaway**: The `users` table with a non-null `password` field is the primary blocker for fresh SSO onboarding. Complete user deletion resolves the issue and allows fresh Azure AD account creation, but requires careful handling of admin privileges and user communication.
+
+::: {.callout-note}
+**Related Reading**: For understanding when to use different SSO configuration options, see [SSO Configuration Decisions](../explanation/sso-configuration-decisions.qmd).
+:::
