@@ -22,6 +22,8 @@ website:
             file: explanation/database-architecture.qmd
           - text: "ClickHouse Replication Architecture"
             file: explanation/clickhouse-replication-architecture.qmd
+          - text: "SSO Configuration Decisions"
+            file: explanation/sso-configuration-decisions.qmd
           - text: "Observability Hierarchy"
             file: explanation/observability-hierarchy.qmd
       - text: "Learning"

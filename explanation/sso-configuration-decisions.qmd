@@ -1,0 +1,152 @@
+---
+title: "SSO Configuration Decisions"
+format:
+  html:
+    toc: true
+diataxis:
+  type: "explanation"
+  purpose: "Understanding-oriented - Context and background for SSO configuration choices"
+categories: ["Authentication", "Configuration", "SSO"]
+---
+
+::: {.callout-note icon="false"}
+**📚 Explanation** - This guide explains the reasoning behind different SSO configuration options and helps you understand when to use each approach.
+:::
+
+**Context**: When configuring LangFuse with Azure AD SSO, administrators often struggle with the `signUpDisabled` setting and its interaction with other authentication controls. This explanation clarifies the decision-making process.
+
+## Authentication Control Layers
+
+LangFuse provides multiple layers of authentication control that work together:
+
+```{mermaid}
+flowchart TD
+    A[User Attempts Access] --> B{signUpDisabled?}
+    B -->|false| C{Password Auth Enabled?}
+    B -->|true| D[Invitation Required]
+    C -->|false| E{Domain Enforcement?}
+    C -->|true| F[Password Login Available]
+    E -->|yes| G[SSO Required for Domain]
+    E -->|no| H[SSO Available for All]
+    D --> I[Admin Must Invite]
+    F --> J[Multiple Auth Methods]
+    G --> K[Domain Users: SSO Only]
+    H --> L[Users Choose Auth Method]
+```
+
+## Configuration Philosophy
+
+### The "Secure by Default" Approach
+
+**Principle**: Use the minimum necessary restrictions while maintaining security.
+
+**Recommended Configuration**:
+```yaml
+AUTH_DISABLE_USERNAME_PASSWORD: true
+AUTH_DOMAINS_WITH_SSO_ENFORCEMENT: justice.gov.uk
+signUpDisabled: false
+```
+
+**Why this works**:
+
+1. **Password authentication disabled** → No weak password vulnerabilities
+2. **Domain enforcement** → Only organizational users can access
+3. **Self-service onboarding** → Reduces administrative overhead
+
+### Understanding signUpDisabled
+
+The `signUpDisabled` setting controls whether users can create accounts without explicit invitation.
+
+#### signUpDisabled: false (Recommended)
+
+**When to use**: Most organizational deployments with domain enforcement
+
+**Benefits**:
+
+- ✅ New team members can self-onboard
+- ✅ Reduced administrative overhead
+- ✅ Faster user adoption
+- ✅ No invitation management required
+
+**Security considerations**:
+
+- Domain enforcement prevents unauthorized access
+- Password authentication disabled prevents weak credentials
+- SSO provides centralized access control
+
+#### signUpDisabled: true (High Control)
+
+**When to use**: Highly regulated environments or small teams requiring explicit approval
+
+**Benefits**:
+
+- ✅ Maximum control over user access
+- ✅ Audit trail of all user additions
+- ✅ Explicit approval process for every user
+
+**Trade-offs**:
+
+- ❌ Administrative overhead for every new user
+- ❌ Delayed onboarding process
+- ❌ Potential bottleneck for team growth
+
+::: {.callout-warning}
+**SSO Migration Impact**: If you have `signUpDisabled: true` during SSO migration, existing users whose database records have been scrubbed will encounter an "OAuthCreateAccount Contact support if this error is unexpected" error in the UI. This happens because the disabled signup setting prevents the automatic creation of new SSO accounts, even when users click valid invitation links.
+
+**Solution**: Temporarily set `signUpDisabled: false` during migration, or ensure all users have valid pending invitations before their database records are cleaned.
+:::
+
+### Configuration Validation
+
+Check your current setup:
+
+```bash
+# Verify authentication configuration
+kubectl get configmap langfuse-config -n langfuse -o yaml | grep -E "AUTH_DISABLE_USERNAME_PASSWORD|AUTH_DOMAINS_WITH_SSO_ENFORCEMENT|signUpDisabled"
+```
+
+**Interpret results**:
+- `AUTH_DISABLE_USERNAME_PASSWORD: true` + domain enforcement = Secure foundation
+- `signUpDisabled: false` + domain enforcement = Self-service for organization
+- `signUpDisabled: true` = Manual approval required
+
+## Common Misconceptions
+
+### "signUpDisabled: false is insecure"
+
+**Reality**: When combined with domain enforcement and disabled password authentication, `signUpDisabled: false` is secure. Only users from your organization can create accounts, and they must use SSO.
+
+### "Domain enforcement is enough"
+
+**Reality**: Domain enforcement controls *who* can access, but other settings control *how* they authenticate. The combination provides layered security.
+
+### "Invitations are always more secure"
+
+**Reality**: Invitations add administrative overhead without significant security benefit when domain enforcement is properly configured.
+
+## Migration Considerations
+
+At times, you may need to amend your auth strategy from password to SSO, or you'll
+be changing your Entra App registration for auth reasons. This means you'll need to
+follow advice in the [User Management and SSO Migration](../how-to/user-management.qmd) guide,
+in order to remove users from the database and re-add them with the new auth method.
+
+### From Password to SSO
+
+When migrating from password-based authentication:
+
+1. **Phase 1**: Enable SSO alongside passwords
+2. **Phase 2**: Enforce SSO for your domain
+3. **Phase 3**: Disable password authentication
+4. **Phase 4**: Adjust `signUpDisabled` based on operational needs
+
+### From Manual to Self-Service
+
+When moving from `signUpDisabled: true` to `false`:
+
+1. Ensure domain enforcement is configured
+2. Verify password authentication is disabled
+3. Test with a new user account
+4. Monitor for unexpected access patterns
+
+**Key Principle**: The most secure configuration is the one that's properly implemented and maintained. Choose settings that match your organization's operational capabilities and security requirements.
